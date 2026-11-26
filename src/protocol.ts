@@ -117,5 +117,12 @@ export const ssidFromMac = (m: string) => 'G2-' + m.replace(/:/g, '').slice(-4).
 export const GLASSES_COMMANDS = {
   audioOn: '0700010001000100010000000000000000000000',
   audioOff: '0700010001000100000000000000000000000000',
+  // Talking through the glasses (same capture): the official app answers a button press with ackButton,
+  // then micOn; it sends micOff when you stop talking, micOn again after its spoken answer (follow-up),
+  // and endSession when the conversation is over.
+  ackButton: '0100010001000100020000000000000000000000',
+  micOn: '0800010001000100010000000000000000000000',
+  micOff: '0800010001000100000000000000000000000000',
+  endSession: '0500010001000100000000000000000000000000',
 } as const;
 export type GlassesCommand = keyof typeof GLASSES_COMMANDS;
