@@ -150,7 +150,13 @@ class GlassesLink {
   syncAudio() {
     if (this.state !== 'connected') return;
     const want = getSettings().glassesAudio;
-    if (want) this.glassesCommand('audioOn').catch(() => {}); // like the official app, never send audioOff
+    if (!want) return;
+    // The glasses only join as headphones on an off -> on change (02:17 off, 02:19 on = joined; repeated "on" = nothing),
+    // so reset first. If the headphones link was already up it drops and comes back within a few seconds.
+    this.glassesCommand('audioOff')
+      .then(() => new Promise((r) => setTimeout(r, 1500)))
+      .then(() => this.glassesCommand('audioOn'))
+      .catch(() => {});
   }
 
   async disconnect() {
