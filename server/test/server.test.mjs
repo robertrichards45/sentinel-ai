@@ -104,3 +104,12 @@ test('findAudio reads audio from the Interactions response', async () => {
   assert.equal(findAudio({ output_audio: { data: 'WFla' } }).data, 'WFla');
   assert.equal(findAudio({ steps: [] }), null);
 });
+
+test('respond accepts a PDF or text file and ignores unknown types', async () => {
+  const { issueToken } = await import('../src/auth.mjs'); // own install: the shared one is at its daily limit
+  const token = issueToken('filetester01').token;
+  const pdf = await (await post('/v1/respond', { mode: 'reader', text: 'read it', file: { mime: 'application/pdf', base64: 'JVBERi0=', name: 'a.pdf' } }, token)).json();
+  assert.match(pdf.text, /\[file application\/pdf\]/);
+  const bad = await (await post('/v1/respond', { mode: 'reader', text: 'x', file: { mime: 'application/x-msdownload', base64: 'AAAA' } }, token)).json();
+  assert.doesNotMatch(bad.text, /\[file/);
+});

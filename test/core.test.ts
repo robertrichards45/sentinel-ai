@@ -5,6 +5,7 @@ import { checkMedia, fixedExifDate, repairJpegDate, readExifDate, findExifSegmen
 import { parseAssistantTurn, validateAction } from '../src/intents';
 import { addFact, forget, addTurn, memoryPrompt, EMPTY, MAX_HISTORY } from '../src/memoryCore';
 import { BUILT_IN_MODES, importModes } from '../src/modes';
+import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
 let fails = 0;
@@ -73,5 +74,19 @@ check('memory prompt contains facts', memoryPrompt(m).includes('F-150'));
 const imp = importModes('[{"id":"Fishing Guide!","name":"Fishing","prompt":"Identify fish"},{"id":"general","name":"x","prompt":"y"},{"name":"no id"}]', BUILT_IN_MODES);
 check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].id === 'fishingguide' && imp.errors.length === 2, imp);
 
+
+// ---- documents ----
+{
+  const t = parseAssistantTurn('{"reply":"Done.","actions":[{"type":"document","title":"Packing list","content":"# Trip\\n- socks"}]}', []);
+  check('document action parsed, defaults to pdf', t.actions[0]?.type === 'document' && (t.actions[0] as any).format === 'pdf', t.actions);
+  check('document without content rejected', validateAction({ type: 'document', title: 'x', content: '  ' }, []) === null, 'kept');
+  const h = markdownToHtmlBody('# Title\n\nHello **bold** and *it*.\n\n- a\n- b\n\n1. one\n2. two\n\n| A | B |\n|---|---|\n| 1 | 2 |');
+  check('markdown: heading, bold, italic', h.includes('<h1>Title</h1>') && h.includes('<strong>bold</strong>') && h.includes('<em>it</em>'), h);
+  check('markdown: lists and table', h.includes('<ul><li>a</li><li>b</li></ul>'.replace(/></g, '>\n<')) || (h.includes('<li>a</li>') && h.includes('<ol>') && h.includes('<td>2</td>') && h.includes('<th>A</th>')), h);
+  const x = markdownToHtmlBody('<script>alert(1)</script> & "q"');
+  check('markdown: HTML is escaped (no injection)', !x.includes('<script>') && x.includes('&lt;script&gt;') && x.includes('&amp;'), x);
+  check('document has title when no H1', documentHtml('My Plan', 'text').includes('<h1>My Plan</h1>'), 'no title');
+  check('safe file name', fileNameFor('Q4: report / draft*?', 'pdf') === 'Q4 report draft.pdf' && fileNameFor('***', 'md') === 'Alice document.md', fileNameFor('Q4: report / draft*?', 'pdf'));
+}
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

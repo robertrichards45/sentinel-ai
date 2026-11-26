@@ -14,10 +14,13 @@ async function call(path, init, timeoutMs = 60000) {
   } finally { clearTimeout(t); }
 }
 
-export async function respond({ model, system, history, text, imageBase64, search }) {
+export async function respond({ model, system, history, text, imageBase64, search, file }) {
   const input = history.map((h) => ({ role: h.role, content: [{ type: h.role === 'user' ? 'input_text' : 'output_text', text: h.text }] }));
   const content = [{ type: 'input_text', text: text || 'What do you see?' }];
   if (imageBase64) content.push({ type: 'input_image', image_url: `data:image/jpeg;base64,${imageBase64}` });
+  if (file && file.mime.startsWith('image/')) content.push({ type: 'input_image', image_url: `data:${file.mime};base64,${file.base64}` });
+  else if (file && file.mime === 'application/pdf') content.push({ type: 'input_file', filename: file.name, file_data: `data:application/pdf;base64,${file.base64}` });
+  else if (file) content.push({ type: 'input_text', text: `Attached file "${file.name}":\n` + Buffer.from(file.base64, 'base64').toString('utf8').slice(0, 200000) });
   input.push({ role: 'user', content });
   const body = { model, instructions: system, input, store: false };
   if (search) body.tools = [{ type: 'web_search' }];

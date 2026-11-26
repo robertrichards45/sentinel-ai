@@ -13,7 +13,8 @@ export type Action =
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
   | { type: 'glasses_status' }
-  | { type: 'set_mode'; mode: string };
+  | { type: 'set_mode'; mode: string }
+  | { type: 'document'; title: string; format: 'pdf' | 'text'; content: string };
 
 export type AssistantTurn = { reply: string; actions: Action[] };
 
@@ -55,6 +56,11 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'where_am_i': return { type: 'where_am_i' };
     case 'glasses_status': return { type: 'glasses_status' };
     case 'set_mode': return knownModes.includes(a.mode) ? { type: 'set_mode', mode: a.mode } : null;
+    case 'document': {
+      const title = str(a.title, 120), content = str(a.content, 40000);
+      if (!title || !content) return null;
+      return { type: 'document', title, format: a.format === 'text' ? 'text' : 'pdf', content };
+    }
     default: return null;
   }
 }
@@ -88,4 +94,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"where_am_i"}
 {"type":"glasses_status"}
 {"type":"set_mode","mode":"<mode id>"}
+{"type":"document","title":"...","format":"pdf|text","content":"<the COMPLETE document in Markdown: # title, ## headings, - lists, | tables |>"}
+   use when the user asks you to write, create, draft or make a document, letter, report, list, plan, resume or similar.
+   Put the whole document in "content"; in "reply" just say briefly what you made (do not read the document aloud).
 Never invent facts about the user. Never claim an action is done; the app confirms it.`;

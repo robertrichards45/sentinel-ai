@@ -62,8 +62,10 @@ export async function transcribe(fileUri: string): Promise<string> {
 
 export type ChatMsg = { role: 'user' | 'assistant'; text: string };
 
-export async function respond(mode: string, system: string, history: ChatMsg[], text: string, imageBase64?: string): Promise<AIAnswer> {
-  const j = await call('/v1/respond', { mode, system, history, text, imageBase64, provider: getSettings().providerOverride || undefined });
+export type Attachment = { mime: string; base64: string; name: string };
+
+export async function respond(mode: string, system: string, history: ChatMsg[], text: string, imageBase64?: string, file?: Attachment): Promise<AIAnswer> {
+  const j = await call('/v1/respond', { mode, system, history, text, imageBase64, file, provider: getSettings().providerOverride || undefined }, file ? 120000 : 60000);
   return { text: String(j.text ?? ''), provider: j.provider ?? '?', model: j.model ?? '?', ms: j.ms ?? 0, sources: Array.isArray(j.sources) ? j.sources : [], costUsd: j.costUsd ?? null };
 }
 

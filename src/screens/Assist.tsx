@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAudioRecorder } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
+import type { Attachment } from '../ai';
 import { useKeepAwake } from 'expo-keep-awake';
 import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
@@ -35,6 +38,7 @@ export default function Assist() {
   const [typed, setTyped] = useState('');
   const [log, setLog] = useState<Exchange[]>([]);
   const [err, setErr] = useState('');
+  const [attached, setAttached] = useState<Attachment | null>(null);
   const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
   const listeningRef = useRef(false);
   const pressingRef = useRef(false);
@@ -46,7 +50,7 @@ export default function Assist() {
 
   const run = async (o: Parameters<typeof ask>[0]) => {
     setBusy(true); setErr('');
-    try { const ex = await ask({ ...o, modeId: mode.id }); setLog((l) => [ex, ...l].slice(0, 30)); }
+    try { const ex = await ask({ file: attached ?? undefined, ...o, modeId: mode.id }); setLog((l) => [ex, ...l].slice(0, 30)); }
     catch (e: any) { setErr(String(e?.message ?? e)); }
     finally { setBusy(false); }
   };
@@ -118,6 +122,21 @@ export default function Assist() {
     return !r.canceled && r.assets?.[0]?.base64 ? r.assets[0].base64 : undefined;
   };
 
+  /** Pick a PDF, text file or picture; Alice reads it aloud and keeps it for follow-up questions. */
+  const pickFile = async () => {
+    setErr('');
+    const r = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'text/*', 'image/*'], copyToCacheDirectory: true });
+    if (r.canceled || !r.assets?.[0]) return;
+    const a = r.assets[0];
+    if ((a.size ?? 0) > 8_000_000) { setErr('That file is over 8 MB. Try a smaller PDF or a photo of the page.'); return; }
+    const ext = (a.name.split('.').pop() ?? '').toLowerCase();
+    const mime = a.mimeType && a.mimeType !== 'application/octet-stream' ? a.mimeType
+      : ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ['jpg', 'jpeg'].includes(ext) ? 'image/jpeg' : ext === 'md' ? 'text/markdown' : ext === 'csv' ? 'text/csv' : 'text/plain';
+    const file: Attachment = { mime: mime.startsWith('text/') && !['text/plain', 'text/markdown', 'text/csv', 'text/html'].includes(mime) ? 'text/plain' : mime, base64: await new File(a.uri).base64(), name: a.name };
+    setAttached(file);
+    run({ file });
+  };
+
   const state: OrbState = listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
   const status = listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
   const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
@@ -151,6 +170,12 @@ export default function Assist() {
         </View>
         <Text style={[S.dim, { textAlign: 'center' }]}>{listening ? `Microphone: ${mic}` : hint}</Text>
       </View>
+
+      <View style={S.row}>
+        <Btn style={{ flex: 1 }} kind="ghost" icon="document-text-outline" title={attached ? 'Read another file' : 'Read a file'} onPress={pickFile} />
+        {attached ? <Btn kind="ghost" icon="close" title="Done" onPress={() => setAttached(null)} /> : null}
+      </View>
+      {attached ? <Text style={[S.dim, { textAlign: 'center' }]} numberOfLines={1}>Ask anything about "{attached.name}". Tap Done to stop.</Text> : null}
 
       {mode.wantsImage ? (
         <View style={S.row}>

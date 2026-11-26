@@ -2,7 +2,7 @@
 //   GET  /health
 //   POST /v1/register     {installId?}                          -> {installId, token}
 //   POST /v1/transcribe   {audioBase64, mime}                   -> {text, provider, model, ms}
-//   POST /v1/respond      {mode, system, history, text, imageBase64?, provider?}
+//   POST /v1/respond      {mode, system, history, text, imageBase64?, file?: {mime, base64, name}, provider?}
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
 //   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
@@ -40,6 +40,8 @@ async function body(req) {
   catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
 }
 
+// Documents Alice can read (sent inline to the model).
+const FILE_TYPES = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const clean = (s, max) => (typeof s === 'string' ? s.slice(0, max) : '');
 
 export const server = createServer(async (req, res) => {
@@ -99,6 +101,7 @@ export const server = createServer(async (req, res) => {
     const r = await providerFor(rt.name).respond({
       model: rt.model, system: clean(b.system, 20000), history, text: clean(b.text, 8000),
       imageBase64: typeof b.imageBase64 === 'string' ? b.imageBase64 : undefined, search: rt.search,
+      file: b.file && typeof b.file.base64 === 'string' && FILE_TYPES.includes(b.file.mime) ? { mime: b.file.mime, base64: b.file.base64, name: clean(b.file.name, 120) || 'document' } : undefined,
     });
     return send(res, 200, { text: r.text, provider: rt.name, model: rt.model, tier: rt.tier, ms: Date.now() - t0, usage: r.usage, costUsd: costUsd(rt.model, r.usage), sources: r.sources });
   } catch (e) {

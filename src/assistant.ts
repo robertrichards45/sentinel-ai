@@ -1,4 +1,4 @@
-import { respond, transcribe, Source } from './ai';
+import { respond, transcribe, Source, Attachment } from './ai';
 import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
 import { runAction } from './actions';
 import { memory } from './memory';
@@ -23,14 +23,14 @@ export function offlineAnswer(text: string): string | null {
 }
 
 /** One full turn: optional speech file → text → AI (+image) → actions → spoken reply. */
-export async function ask(opts: { text?: string; audioUri?: string; imageBase64?: string; modeId?: string }): Promise<Exchange> {
+export async function ask(opts: { text?: string; audioUri?: string; imageBase64?: string; file?: Attachment; modeId?: string }): Promise<Exchange> {
   const s = getSettings();
   const mode = allModes().find((m) => m.id === (opts.modeId ?? s.activeMode)) ?? allModes()[0];
   let you = opts.text?.trim() ?? '';
   if (opts.audioUri) you = await transcribe(opts.audioUri);
-  if (!you && !opts.imageBase64) return { you: '', alice: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
+  if (!you && !opts.imageBase64 && !opts.file) return { you: '', alice: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
 
-  const offline = !opts.imageBase64 && mode.id !== 'translator' ? offlineAnswer(you) : null;
+  const offline = !opts.imageBase64 && !opts.file && mode.id !== 'translator' ? offlineAnswer(you) : null;
   if (offline) {
     await speak(offline, undefined, mode.id);
     return { you, alice: offline, outcomes: [], mode: mode.id, t: Date.now() };
@@ -44,12 +44,12 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
 
   const instructions = [mode.prompt, ACTION_SCHEMA_PROMPT, `Available modes: ${allModes().map((m) => m.id).join(', ')}`, s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`].join('\n\n');
   const history = s.memoryEnabled ? memory.get().history.map((h) => ({ role: h.role, text: h.text })) : [];
-  const question = you || (mode.wantsImage ? 'What do you see?' : '');
-  const ans = await respond(mode.id, instructions, history, question, opts.imageBase64);
+  const question = you || (opts.file ? `Read "${opts.file.name}" to me and tell me what it is.` : mode.wantsImage ? 'What do you see?' : '');
+  const ans = await respond(mode.id, instructions, history, question, opts.imageBase64, opts.file);
   const turn = parseAssistantTurn(ans.text, allModes().map((m) => m.id));
 
   const outcomes: string[] = [];
-  if (turn.reply) await speak(mode.speakFull ? turn.reply : turn.reply.slice(0, 1200), undefined, mode.id);
+  if (turn.reply) await speak(mode.speakFull || opts.file ? turn.reply : turn.reply.slice(0, 1200), undefined, mode.id);
   for (const a of turn.actions) {
     try { outcomes.push(await runAction(a)); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
   }

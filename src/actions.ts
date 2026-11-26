@@ -6,6 +6,27 @@ import { Action } from './intents';
 import { memory } from './memory';
 import { getSettings, updateSettings } from './settings';
 import { glassesStatusText } from './glassesState';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { Directory, File, Paths } from 'expo-file-system';
+import { documentHtml, fileNameFor } from './docCore';
+
+/** Alice's documents live in the app's Documents folder ("On My iPhone > Alice" in Files). */
+async function saveDocument(title: string, format: 'pdf' | 'text', content: string): Promise<File> {
+  const dir = new Directory(Paths.document, 'Alice Documents');
+  if (!dir.exists) dir.create();
+  let name = fileNameFor(title, format === 'pdf' ? 'pdf' : 'md');
+  if (new File(dir, name).exists) name = name.replace(/(\.\w+)$/, ` ${new Date().toISOString().slice(0, 16).replace(':', '.')}$1`);
+  const dest = new File(dir, name);
+  if (format === 'pdf') {
+    const { uri } = await Print.printToFileAsync({ html: documentHtml(title, content) });
+    new File(uri).move(dest);
+  } else {
+    dest.create();
+    await dest.write(content);
+  }
+  return dest;
+}
 
 /** Ask the user before anything that creates data outside the app. */
 const confirm = (title: string, msg: string) =>
@@ -76,5 +97,12 @@ export async function runAction(a: Action): Promise<string> {
     case 'set_mode':
       await updateSettings({ activeMode: a.mode });
       return `Switched to ${a.mode} mode.`;
+    case 'document': {
+      const f = await saveDocument(a.title, a.format, a.content);
+      if (await Sharing.isAvailableAsync()) {
+        Sharing.shareAsync(f.uri, { mimeType: a.format === 'pdf' ? 'application/pdf' : 'text/markdown', dialogTitle: a.title, UTI: a.format === 'pdf' ? 'com.adobe.pdf' : 'net.daringfireball.markdown' }).catch(() => {});
+      }
+      return `I made "${a.title}" as a ${a.format === 'pdf' ? 'PDF' : 'text file'}. It's saved in Files under Alice, and you can share, email or print it now.`;
+    }
   }
 }

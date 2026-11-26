@@ -32,10 +32,11 @@ function sources(j) {
   return chunks.map((c) => c.web).filter(Boolean).map((w) => ({ title: w.title ?? w.uri, url: w.uri })).slice(0, 6);
 }
 
-export async function respond({ model, system, history, text, imageBase64, search }) {
+export async function respond({ model, system, history, text, imageBase64, search, file }) {
   const contents = history.map((h) => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.text }] }));
   const parts = [{ text: text || 'What do you see?' }];
   if (imageBase64) parts.push({ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } });
+  if (file) parts.push({ inline_data: { mime_type: file.mime, data: file.base64 } });
   contents.push({ role: 'user', parts });
   const body = { system_instruction: { parts: [{ text: system }] }, contents };
   if (search) body.tools = [{ google_search: {} }];
