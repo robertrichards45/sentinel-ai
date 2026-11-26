@@ -17,3 +17,8 @@ export function onListenRequest(fn: Fn) {
   return () => { if (listener === fn) listener = null; };
 }
 export const isTalkLink = (url?: string | null) => !!url && /^alice:\/\/(talk|listen)/i.test(url);
+
+/** "Hey Alice" heard: the app opens the Talk screen and starts listening. */
+let wakeHandler: Fn | null = null;
+export const onWake = (fn: Fn) => { wakeHandler = fn; return () => { if (wakeHandler === fn) wakeHandler = null; }; };
+export const wake = () => { if (wakeHandler) wakeHandler(); else requestListen(); };

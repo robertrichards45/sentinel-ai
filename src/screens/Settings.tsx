@@ -115,6 +115,7 @@ export default function Settings() {
       </Card>
 
       <Card title="Voice">
+        <Toggle label={'"Hey Alice"'} hint={'Say "Hey Alice" to start talking, no Siri. Uses the phone\'s microphone and Apple\'s on-device recognition (nothing is sent until she wakes). Works while Alice is open or in the background, not after you swipe her closed.'} value={s.heyAlice} onChange={(v) => updateSettings({ heyAlice: v })} />
         <Toggle label="Conversation through the glasses" hint="Press the glasses button and just talk. Alice hears when you stop, answers, then listens for a follow-up, like the Wheat app." value={s.glassesConversation} onChange={(v) => updateSettings({ glassesConversation: v })} />
         <Toggle label="Hear Alice in the glasses" hint="Connects the glasses to your iPhone as Bluetooth headphones (the same way the Wheat app does), so Alice's voice, and music, play through them." value={s.glassesAudio} onChange={(v) => updateSettings({ glassesAudio: v })} />
         {s.glassesAudio ? <View style={[S.row, { justifyContent: 'space-between' }]}><Text style={[S.dim, { flex: 1 }]}>{glasses.lastCommand ? (glasses.lastCommand.error ? `Couldn't reach the glasses: ${glasses.lastCommand.error}` : `Headphones request sent ${new Date(glasses.lastCommand.at).toLocaleTimeString()}`) : 'Waiting for the glasses to connect'}</Text><Btn kind="ghost" title="Send again" onPress={() => glasses.syncAudio(true)} /></View> : null}
@@ -158,7 +159,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.6. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.7. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

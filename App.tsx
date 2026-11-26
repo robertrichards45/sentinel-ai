@@ -21,7 +21,8 @@ import { loadModes } from './src/modeStore';
 import { glasses } from './src/ble';
 import { useGlasses } from './src/hooks';
 import { onGlassesButton } from './src/glassesState';
-import { requestListen, isTalkLink } from './src/triggers';
+import { requestListen, isTalkLink, onWake } from './src/triggers';
+import { wakeWordReady } from './src/wakeWord';
 import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
@@ -80,10 +81,12 @@ function Shell() {
     })();
     // Hands-free starts: alice://talk (Siri shortcut, Action Button) and the glasses' button.
     const talk = () => { setTab('assist'); requestListen(); };
+    const offWake = onWake(talk);
+    wakeWordReady();
     Linking.getInitialURL().then((u) => { if (isTalkLink(u)) talk(); });
     const sub = Linking.addEventListener('url', ({ url }) => { if (isTalkLink(url)) talk(); });
     const offBtn = onGlassesButton(talk);
-    return () => { sub.remove(); offBtn(); };
+    return () => { sub.remove(); offBtn(); offWake(); };
   }, []);
 
   const screens: Record<Tab, React.ReactNode> = {
