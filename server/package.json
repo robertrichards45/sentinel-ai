@@ -1,0 +1,12 @@
+{
+  "name": "alice-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Alice AI gateway: holds provider keys, routes each mode to Gemini or OpenAI, enforces per-install limits.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test test/"
+  }
+}
