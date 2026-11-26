@@ -128,3 +128,25 @@ export const GLASSES_COMMANDS = {
   endSession: '0500010001000100000000000000000000000000',
 } as const;
 export type GlassesCommand = keyof typeof GLASSES_COMMANDS;
+
+/**
+ * The official app's startup "hello" on channel A (56FF/33F3), sent right before the headphones request
+ * (capture 2026-11-26 03:53:19-03:53:22, byte for byte; the glasses echo most of them on 33F4).
+ * Order: info request 20, 1d, language, clock, device info request 0c, ID 48. Approved by Robert 04:51.
+ */
+const pad20 = (b: number[]) => { const o = new Uint8Array(20); o.set(b.slice(0, 20)); return o; };
+const ascii = (t: string) => Array.from(t).map((c) => c.charCodeAt(0));
+export function helloSequence(now = new Date()): Uint8Array[] {
+  const secs = Math.floor(now.getTime() / 1000);
+  const tzHours = -Math.round(now.getTimezoneOffset() / 60); // New York in winter = -5 -> 0xfb
+  return [
+    pad20([0x20]),
+    pad20([0x1d]),
+    pad20([0x21, ...ascii('en-US')]),
+    pad20([0x01, secs & 0xff, (secs >>> 8) & 0xff, (secs >>> 16) & 0xff, (secs >>> 24) & 0xff, tzHours & 0xff]),
+    pad20([0x0c]),
+    pad20([0x48, 0x00, ...ascii('89067110-DD4B-4A3F')]),
+  ];
+}
+/** After the headphones link comes up the glasses send 3a on channel A; the official app echoes it. */
+export const ECHO_3A = pad20([0x3a]);

@@ -1,7 +1,7 @@
 import { BleManager, Device, Subscription, State } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { getSettings, onSettings } from './settings';
-import { GLASSES_COMMANDS, GlassesCommand, UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
+import { ECHO_3A, helloSequence, GLASSES_COMMANDS, GlassesCommand, UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
 
 export type LinkState = 'bluetooth-off' | 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
 export type PacketLogEntry = { t: number; ch: string; hex: string };
@@ -99,6 +99,7 @@ class GlassesLink {
           this.record(label, b);
           const ev = parse(b);
           if (ev.kind === 'address') this.mac = ev.mac;
+          if (label === 'A' && b[0] === 0x3a) this.writeA(ECHO_3A).catch(() => {});
           this.emit(ev);
         }),
       );
@@ -147,11 +148,23 @@ class GlassesLink {
   }
   lastCommand: { name: GlassesCommand; at: number; error?: string } | null = null;
 
+  /** Channel A (56FF/33F3) writes: only the official app's hello and the 3a echo, nothing else. */
+  private async writeA(bytes: Uint8Array) {
+    if (!this.device) throw new Error('glasses not connected');
+    this.record('W:56ff', bytes);
+    await this.device.writeCharacteristicWithResponseForService(UUID.SVC_A, UUID.A_WRITE, Buffer.from(bytes).toString('base64'));
+  }
+
   /** Keep headset mode in step with the setting: on connect, once settings have loaded, and when toggled. */
   syncAudio() {
     if (this.state !== 'connected') return;
     const want = getSettings().glassesAudio;
-    if (want) this.glassesCommand('audioOn').catch(() => {}); // 07..00, exactly as the official app sends it
+    if (!want) return;
+    // Exactly the official app's order: hello on channel A (about 0.4 s apart), then the headphones request.
+    (async () => {
+      for (const b of helloSequence()) { await this.writeA(b); await new Promise((r) => setTimeout(r, 400)); }
+      await this.glassesCommand('audioOn');
+    })().catch((e) => { this.log.push({ t: Date.now(), ch: 'ERR', hex: `hello: ${String(e?.message ?? e)}` }); });
   }
 
   async disconnect() {
