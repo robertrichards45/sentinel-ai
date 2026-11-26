@@ -1,3 +1,4 @@
+import { note } from './diary';
 /**
  * Talk to Alice through the glasses themselves (verified protocol, see src/protocol.ts and DIAGNOSTIC_LOG 22):
  * press the glasses button -> the glasses stream your voice from THEIR microphone over Bluetooth as Opus -> Alice answers.
@@ -85,6 +86,8 @@ async function finish() {
     const said = f.filter((x) => !isSilent(x)).length;
     if (said < 5 || getSettings().privacyMode) { emit('state', 'idle'); endSession(); return; } // nothing said
     heard = true; emit('state', 'thinking');
+    const tEnd = Date.now();
+    note('glasses-turn', { speechMs: spoke, frames: f.length });
     const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
     // Fast path: answer through the live conversation (streams Alice's voice as it is generated, ~2-3 s)
     // instead of the one-question path (whole answer, then a separate voice step, 5-10 s).
@@ -93,13 +96,17 @@ async function finish() {
     if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }
     if (useLive || (live.state !== 'off' && live.state !== 'error')) {
       const [text, ready] = await Promise.all([transcribeAudio(audio), liveReady()]); // in parallel
-      if (text && ready) { live.sendText(text); await waitLiveReply(); }
-      else if (text) { const ex = await ask({ text }); emit('exchange', ex); }
+      const tHeard = Date.now();
+      if (text && ready) { live.sendText(text); const first = await waitLiveReply(); note('reply-timing', { path: 'live', transcribeMs: tHeard - tEnd, firstVoiceMs: first ? first - tEnd : null }); }
+      else if (text) { const ex = await ask({ text }); emit('exchange', ex); note('reply-timing', { path: 'fallback', liveReady: ready, totalMs: Date.now() - tEnd }); }
+      else note('reply-timing', { path: 'live', heard: false, transcribeMs: tHeard - tEnd });
     } else {
       const ex = await ask({ audioData: audio });
       emit('exchange', ex);
+      note('reply-timing', { path: 'classic', totalMs: Date.now() - tEnd });
     }
   } catch (e: any) {
+    note('glasses-turn-error', { msg: String(e?.message ?? e) });
     emit('error', String(e?.message ?? e));
     endSession();
   } finally {
@@ -109,10 +116,12 @@ async function finish() {
 }
 
 /** Wait for the live reply to start and finish (or give up after 30 s). */
-async function waitLiveReply() {
+async function waitLiveReply(): Promise<number | null> {
   const t = Date.now();
   while (Date.now() - t < 8000 && live.state !== 'speaking') await new Promise((r) => setTimeout(r, 100));
+  const first = live.state === 'speaking' ? Date.now() : null;
   while (Date.now() - t < 30000 && (live.state === 'speaking' || live.state === 'thinking')) await new Promise((r) => setTimeout(r, 150));
+  return first;
 }
 
 glasses.on((e: any) => {

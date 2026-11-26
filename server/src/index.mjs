@@ -68,6 +68,19 @@ export const server = createServer(async (req, res) => {
       return send(res, 200, { usage: usageSnapshot(), routes: config.routes, models: config.models, search: config.searchModes, voices: config.voices, defaultVoice: config.defaultVoice, providers: Object.keys(PROVIDERS).filter(hasKey) });
     }
 
+    // Diagnostic diary from the app: events only (no conversation text), printed to the server log.
+    if (req.method === 'POST' && url.pathname === '/v1/diag') {
+      if (!take('d:' + installId, 400)) return send(res, 429, { error: 'Diagnostics limit reached for today.' });
+      const b = await body(req);
+      const events = Array.isArray(b.events) ? b.events.slice(0, 200) : [];
+      const who = String(installId).slice(0, 8);
+      for (const e of events) {
+        const line = JSON.stringify({ t: Number(e?.t) || 0, k: clean(String(e?.k ?? ''), 40), d: e?.d ?? undefined }).slice(0, 1200);
+        console.log(`DIAG ${who} ${line}`);
+      }
+      return send(res, 200, { ok: true, n: events.length });
+    }
+
     if (req.method === 'POST' && url.pathname === '/v1/live') {
       if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Real-time voice needs a Gemini key on the server.' });
       if (!take('global-live', config.limits.globalPerDay)) return send(res, 429, { error: 'Alice is at today\'s capacity. Try again tomorrow.' });

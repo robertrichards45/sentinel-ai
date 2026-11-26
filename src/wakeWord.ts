@@ -12,6 +12,7 @@ import { onSpeaking } from './voice';
 import { live } from './live';
 import { glassesVoiceActive } from './glassesVoice';
 import { wake } from './triggers';
+import { note } from './diary';
 
 const WAKE = /\b(hey|hi|hay|okay|ok)[\s,.!]*(alice|alyce|alis|allis|elise|alys)\b/i;
 export const heardWakeWord = (t: string) => WAKE.test(t);
@@ -51,11 +52,12 @@ ExpoSpeechRecognitionModule.addListener('result', (ev: any) => {
   const text = (ev?.results ?? []).map((r: any) => r?.transcript ?? '').join(' ');
   if (!heardWakeWord(text) || Date.now() - lastWake < 4000) return;
   lastWake = Date.now();
+  note('wake-word');
   stop();
   setTimeout(wake, 500); // let iOS release the microphone before Alice opens it
 });
 ExpoSpeechRecognitionModule.addListener('end', () => { running = false; });
-ExpoSpeechRecognitionModule.addListener('error', () => { running = false; });
+ExpoSpeechRecognitionModule.addListener('error', (e: any) => { running = false; if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });
 
 async function setEnabled(on: boolean) {
   if (on === enabled) return;

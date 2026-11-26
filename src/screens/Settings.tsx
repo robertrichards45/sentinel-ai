@@ -8,6 +8,7 @@ import { serverStatus, DEFAULT_SERVER } from '../ai';
 import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
+import { diaryEvents } from '../diary';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
@@ -32,6 +33,13 @@ export default function Settings() {
     f.create();
     await f.write(glasses.log.map((l) => JSON.stringify(l)).join('\n'));
     await Sharing.shareAsync(f.uri, { mimeType: 'text/plain', dialogTitle: 'Share Bluetooth log' });
+  };
+
+  const exportDiary = async () => {
+    const f = new File(Paths.cache, `alice-diary-${Date.now()}.jsonl`);
+    f.create();
+    await f.write(diaryEvents().map((l) => JSON.stringify(l)).join('\n'));
+    await Sharing.shareAsync(f.uri, { mimeType: 'text/plain', dialogTitle: 'Share diagnostic diary' });
   };
 
   return (
@@ -148,6 +156,8 @@ export default function Settings() {
       <Card title="Diagnostics">
         <Text style={S.dim}>Commands to glasses: {WRITES_ENABLED ? 'on' : 'off (read-only)'}. Firmware-update service: always blocked. Packets logged: {glasses.log.length}.</Text>
         <Btn kind="ghost" title="Share Bluetooth log" disabled={!glasses.log.length} onPress={exportLog} />
+        <Btn kind="ghost" title="Share diagnostic diary" onPress={exportDiary} />
+        <Text style={S.dim}>The diary records events only (connections, commands, reply times, errors), never what you say. It is also sent to Alice's server unless Privacy mode is on.</Text>
       </Card>
 
       <Card title="Feature status" right={<Btn kind="ghost" title={showMatrix ? 'Hide' : 'Show'} onPress={() => setShowMatrix(!showMatrix)} />}>
@@ -159,7 +169,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.7. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.8. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

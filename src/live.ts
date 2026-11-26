@@ -1,3 +1,4 @@
+import { note } from './diary';
 import { setPhoneMic } from './micState';
 /**
  * Real-time conversation with Alice (Gemini Live), ChatGPT-voice style:
@@ -65,7 +66,8 @@ class LiveSession {
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
   spokeAt = 0;
-  private set(s: LiveState, detail?: string) { if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+  private set(s: LiveState, detail?: string) {
+    if (s === 'error' || (s === 'listening' && this.state === 'connecting')) note(s === 'error' ? 'live-error' : 'live-connected', { detail, ms: Date.now() - this.t0 }); if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
   /** mic:false = no phone microphone; the words come from the glasses' own mic via sendText (glasses button). */
   useMic = true;

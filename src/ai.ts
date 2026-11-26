@@ -1,3 +1,4 @@
+import { note, setDiarySender } from './diary';
 import { File } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import { secret } from './storage';
@@ -32,6 +33,7 @@ async function call(path: string, body: unknown, timeoutMs = 60000, retried = fa
   if (getSettings().privacyMode) throw new AIError('Privacy mode is on. Alice is offline and nothing leaves this iPhone.');
   const token = (await secret.get(TOKEN)) ?? (await register());
   const ctl = new AbortController();
+  const t0 = Date.now();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const r = await fetch(server() + path, {
@@ -44,6 +46,7 @@ async function call(path: string, body: unknown, timeoutMs = 60000, retried = fa
     if (!r.ok) throw new AIError(j.error ?? `Alice's server returned ${r.status}.`);
     return j;
   } catch (e: any) {
+    if (path !== '/v1/diag') note('ai-error', { path, msg: String(e?.message ?? e), ms: Date.now() - t0 });
     if (e?.name === 'AbortError') throw new AIError('Alice took too long to answer. Check your connection and try again.');
     if (e instanceof AIError) throw e;
     throw new AIError("Couldn't reach Alice's server. Check your internet connection.");
@@ -51,6 +54,8 @@ async function call(path: string, body: unknown, timeoutMs = 60000, retried = fa
     clearTimeout(t);
   }
 }
+
+setDiarySender(async (events) => { await call('/v1/diag', { events }, 20000); });
 
 /** A recording as an attachment for respond() (one round trip). */
 export async function audioOf(fileUri: string): Promise<{ mime: string; base64: string }> {

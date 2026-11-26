@@ -1,3 +1,4 @@
+import { note } from './diary';
 import { BleManager, Device, Subscription, State } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
 import { getSettings, onSettings } from './settings';
@@ -33,6 +34,7 @@ class GlassesLink {
     this.listeners.forEach((fn) => fn(e));
   }
   private setState(s: LinkState, detail?: string) {
+    if (s !== this.state) note('glasses-link', { state: s, detail });
     this.state = s;
     this.emit({ kind: 'link', state: s, detail });
   }
@@ -137,10 +139,12 @@ class GlassesLink {
       this.record('W:57ff', bytes);
       await this.device.writeCharacteristicWithResponseForService(UUID.SVC_B, UUID.B_WRITE, Buffer.from(bytes).toString('base64'));
       this.lastCommand = { name, at: Date.now() };
+      note('glasses-cmd', { name });
     } catch (e: any) {
       const msg = String(e?.message ?? e);
       this.log.push({ t: Date.now(), ch: 'ERR', hex: `${name}: ${msg}` });
       this.lastCommand = { name, at: Date.now(), error: msg };
+      note('glasses-cmd-error', { name, msg });
       throw e;
     } finally {
       this.emit({ kind: 'command', ...this.lastCommand });
@@ -169,7 +173,7 @@ class GlassesLink {
     (async () => {
       for (const b of helloSequence()) { await this.writeA(b); await new Promise((r) => setTimeout(r, 400)); }
       await this.glassesCommand('audioOn');
-    })().catch((e) => { this.log.push({ t: Date.now(), ch: 'ERR', hex: `hello: ${String(e?.message ?? e)}` }); })
+    })().catch((e) => { this.log.push({ t: Date.now(), ch: 'ERR', hex: `hello: ${String(e?.message ?? e)}` }); note('hello-error', { msg: String(e?.message ?? e) }); })
       .finally(() => { this.syncing = false; });
   }
 
