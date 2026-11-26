@@ -11,7 +11,7 @@ export const config = {
   routes: json(env.ROUTES, { default: 'gemini' }),
   transcribeProvider: env.TRANSCRIBE_PROVIDER ?? 'gemini',
   models: {
-    gemini: { fast: env.GEMINI_FAST_MODEL ?? 'gemini-3.8-flash', research: env.GEMINI_RESEARCH_MODEL ?? 'gemini-4-argon', transcribe: env.GEMINI_TRANSCRIBE_MODEL ?? 'gemini-3.8-flash' },
+    gemini: { fast: env.GEMINI_FAST_MODEL ?? 'gemini-3.8-flash', research: env.GEMINI_RESEARCH_MODEL ?? 'gemini-4-argon', transcribe: env.GEMINI_TRANSCRIBE_MODEL ?? 'gemini-3.8-flash', tts: env.GEMINI_TTS_MODEL ?? 'gemini-3.8-flash-tts' },
     openai: { fast: env.OPENAI_FAST_MODEL ?? 'gpt-6-luna', research: env.OPENAI_RESEARCH_MODEL ?? 'gpt-6-luna', transcribe: env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-transcribe' },
   },
   // Modes that may use web search (Google Search / OpenAI web_search)
@@ -24,7 +24,11 @@ export const config = {
     'gemini-3.8-flash': [1.50, 9.00],
     'gemini-4-argon': [null, null],
   }),
+  // Natural voices for Alice (Gemini prebuilt voices). The app may pick any of these.
+  voices: json(env.VOICES, ['Sulafat', 'Aoede', 'Achernar', 'Vindemiatrix', 'Kore', 'Leda', 'Puck', 'Achird', 'Charon', 'Algieba', 'Iapetus', 'Gacrux']),
+  defaultVoice: env.DEFAULT_VOICE ?? 'Sulafat',
   limits: {
+    speechPerInstallPerDay: Number(env.SPEECH_DAILY_LIMIT ?? 600),
     perInstallPerDay: Number(env.DAILY_LIMIT ?? 300),
     globalPerDay: Number(env.GLOBAL_DAILY_LIMIT ?? 5000),     // hard spend brake for the whole server
     registrationsPerIpPerDay: Number(env.REG_LIMIT_PER_IP ?? 10),

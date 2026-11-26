@@ -1,5 +1,7 @@
 import * as Speech from 'expo-speech';
-import { AudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { AudioRecorder, AudioPlayer, createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { File, Paths } from 'expo-file-system';
+import { speechAudio } from './ai';
 import { getSettings } from './settings';
 
 /**
@@ -56,16 +58,85 @@ const speakingListeners = new Set<(on: boolean) => void>();
 export const onSpeaking = (fn: (on: boolean) => void) => { speakingListeners.add(fn); return () => { speakingListeners.delete(fn); }; };
 const setSpeaking = (on: boolean) => speakingListeners.forEach((f) => f(on));
 
-export function speak(text: string, language?: string): Promise<void> {
-  const s = getSettings();
+/**
+ * Alice's voices. Natural voices are made by Gemini on Alice's server (needs internet);
+ * 'iphone' is the built-in iOS voice and always works offline. Names must match server/src/config.mjs.
+ */
+export const VOICES: { id: string; label: string; feel: string }[] = [
+  { id: 'Sulafat', label: 'Sulafat', feel: 'Warm' },
+  { id: 'Aoede', label: 'Aoede', feel: 'Breezy' },
+  { id: 'Achernar', label: 'Achernar', feel: 'Soft' },
+  { id: 'Vindemiatrix', label: 'Vindemiatrix', feel: 'Gentle' },
+  { id: 'Kore', label: 'Kore', feel: 'Firm' },
+  { id: 'Leda', label: 'Leda', feel: 'Youthful' },
+  { id: 'Puck', label: 'Puck', feel: 'Upbeat' },
+  { id: 'Achird', label: 'Achird', feel: 'Friendly' },
+  { id: 'Charon', label: 'Charon', feel: 'Informative' },
+  { id: 'Algieba', label: 'Algieba', feel: 'Smooth' },
+  { id: 'Iapetus', label: 'Iapetus', feel: 'Clear' },
+  { id: 'Gacrux', label: 'Gacrux', feel: 'Mature' },
+  { id: 'iphone', label: 'iPhone voice', feel: 'Offline, instant' },
+];
+
+let player: AudioPlayer | null = null;
+let generation = 0; // a newer speak()/stop cancels older ones
+
+function styleFor(rate: number): string {
+  const pace = rate >= 1.25 ? 'at a brisk pace' : rate <= 0.8 ? 'slowly and calmly' : 'at a natural conversational pace';
+  return `warm, natural and friendly, like a helpful companion, ${pace}`;
+}
+
+function speakIphone(text: string, language: string, rate: number, gen: number): Promise<void> {
   return new Promise((resolve) => {
-    const done = () => { setSpeaking(false); resolve(); };
-    Speech.stop();
-    setSpeaking(true);
-    Speech.speak(text, { language: language ?? s.voiceLanguage, rate: s.speechRate, onDone: done, onStopped: done, onError: done });
+    if (gen !== generation) return resolve();
+    Speech.speak(text, { language, rate, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
   });
 }
-export const stopSpeaking = () => Speech.stop();
+
+async function playWav(base64: string, gen: number): Promise<void> {
+  const f = new File(Paths.cache, `alice-voice-${gen}.wav`);
+  if (f.exists) f.delete();
+  f.create();
+  await f.write(base64, { encoding: 'base64' });
+  if (gen !== generation) return;
+  await new Promise<void>((resolve) => {
+    const p = createAudioPlayer(f.uri);
+    player = p;
+    let done = false;
+    const finish = () => { if (done) return; done = true; sub.remove(); clearTimeout(guard); try { p.remove(); } catch {} if (player === p) player = null; try { f.delete(); } catch {} resolve(); };
+    const sub = p.addListener('playbackStatusUpdate', (st) => { if (st.didJustFinish) finish(); });
+    const guard = setTimeout(finish, 120000); // never hang the assistant
+    (p as any).__finish = finish;
+    p.play();
+  });
+}
+
+export function speak(text: string, language?: string): Promise<void> {
+  const s = getSettings();
+  const gen = ++generation;
+  stopPlayback();
+  setSpeaking(true);
+  const lang = language ?? s.voiceLanguage;
+  const run = async () => {
+    if (s.voice !== 'iphone' && !s.privacyMode) {
+      try {
+        const a = await speechAudio(text.slice(0, 3000), s.voice, styleFor(s.speechRate));
+        if (gen !== generation) return;
+        await playWav(a.audioBase64, gen);
+        return;
+      } catch { /* offline, quota or server issue: fall back to the iPhone voice */ }
+    }
+    await speakIphone(text, lang, s.speechRate, gen);
+  };
+  return run().finally(() => { if (gen === generation) setSpeaking(false); });
+}
+
+function stopPlayback() {
+  Speech.stop();
+  const p: any = player;
+  if (p) { try { p.pause(); } catch {} p.__finish?.(); }
+}
+export const stopSpeaking = () => { generation++; stopPlayback(); setSpeaking(false); };
 
 /** Map a language name to an iOS voice locale (best effort; falls back to English). */
 export function localeFor(lang: string): string {

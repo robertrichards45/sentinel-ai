@@ -85,3 +85,22 @@ test('oversized and malformed bodies are rejected', async () => {
   assert.ok([400, 429].includes(bad.status));
   assert.ok(fresh);
 });
+
+test('speak returns a playable WAV and only allows listed voices', async () => {
+  const j = await (await post('/v1/speak', { text: 'Hello Robert', voice: 'Aoede', style: 'warm' }, token)).json();
+  assert.equal(j.voice, 'Aoede');
+  assert.equal(j.mime, 'audio/wav');
+  assert.equal(Buffer.from(j.audioBase64, 'base64').toString('ascii', 0, 4), 'RIFF');
+  const k = await (await post('/v1/speak', { text: 'Hi', voice: 'NotAVoice' }, token)).json();
+  assert.equal(k.voice, 'Sulafat');
+  assert.equal((await post('/v1/speak', { text: '   ' }, token)).status, 400);
+  assert.equal((await post('/v1/speak', { text: 'hi' })).status, 401);
+});
+
+test('findAudio reads audio from the Interactions response', async () => {
+  const { findAudio } = await import('../src/providers/gemini.mjs');
+  const r = { steps: [{ type: 'model_output', content: [{ type: 'text', text: 'x' }, { type: 'audio', data: 'QUJD', mime_type: 'audio/wav' }] }] };
+  assert.equal(findAudio(r).data, 'QUJD');
+  assert.equal(findAudio({ output_audio: { data: 'WFla' } }).data, 'WFla');
+  assert.equal(findAudio({ steps: [] }), null);
+});

@@ -4,6 +4,7 @@
 //   POST /v1/transcribe   {audioBase64, mime}                   -> {text, provider, model, ms}
 //   POST /v1/respond      {mode, system, history, text, imageBase64?, provider?}
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
+//   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
 import { createServer } from 'node:http';
 import { config, costUsd } from './config.mjs';
@@ -59,7 +60,20 @@ export const server = createServer(async (req, res) => {
     if (!installId) return send(res, 401, { error: 'Not signed in. Reopen the app.' });
 
     if (req.method === 'GET' && url.pathname === '/v1/status') {
-      return send(res, 200, { usage: usageSnapshot(), routes: config.routes, models: config.models, search: config.searchModes, providers: Object.keys(PROVIDERS).filter(hasKey) });
+      return send(res, 200, { usage: usageSnapshot(), routes: config.routes, models: config.models, search: config.searchModes, voices: config.voices, defaultVoice: config.defaultVoice, providers: Object.keys(PROVIDERS).filter(hasKey) });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/v1/speak') {
+      if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Natural voice needs a Gemini key on the server.' });
+      if (!take('global-speech', config.limits.globalPerDay * 2)) return send(res, 429, { error: 'Alice\'s voice is at today\'s capacity.' });
+      if (!take('s:' + installId, config.limits.speechPerInstallPerDay)) return send(res, 429, { error: 'Voice limit reached for today.' });
+      const b = await body(req);
+      const text = clean(b.text, 3000).trim();
+      if (!text) return send(res, 400, { error: 'No text' });
+      const voice = config.voices.includes(b.voice) ? b.voice : config.defaultVoice;
+      const t0 = Date.now();
+      const r = await (config.mock ? mock : gemini).speak({ text, voice, style: clean(b.style, 200) || undefined });
+      return send(res, 200, { audioBase64: r.audioBase64, mime: r.mime, voice, model: r.model, ms: Date.now() - t0 });
     }
 
     const isAI = req.method === 'POST' && (url.pathname === '/v1/respond' || url.pathname === '/v1/transcribe');

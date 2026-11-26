@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useSettings } from '../hooks';
@@ -8,7 +8,8 @@ import { serverStatus, DEFAULT_SERVER } from '../ai';
 import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
-import { Btn, C, Card, Field, Pill, S, Toggle, Title } from '../ui';
+import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
+import { VOICES, speak } from '../voice';
 
 const STATUS_COLOR: Record<Status, string> = { tested: C.mint, built: C.violet, partial: C.amber, blocked: C.red, unsupported: C.sub, proposed: C.sub };
 
@@ -47,6 +48,30 @@ export default function Settings() {
               onChange={(v) => { const t = v.trim().toLowerCase(); if (t === '' || t === 'gemini' || t === 'openai') updateSettings({ providerOverride: t as any }); }} />
           </>
         ) : null}
+      </Card>
+
+      <Card title="Alice's voice">
+        <Text style={S.dim}>Natural voices need internet. Without it, Alice uses the iPhone voice automatically.</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {VOICES.map((v) => {
+            const on = s.voice === v.id;
+            const inner = (
+              <View style={{ paddingVertical: 8, paddingHorizontal: 13 }}>
+                <Text style={{ color: on ? '#FFFFFF' : C.ink, fontFamily: on ? F.semibold : F.medium, fontSize: 14 }}>{v.label}</Text>
+                <Text style={{ color: on ? 'rgba(255,255,255,0.85)' : C.sub, fontFamily: F.regular, fontSize: 12 }}>{v.feel}</Text>
+              </View>
+            );
+            return (
+              <Pressable key={v.id} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${v.label}, ${v.feel}`}
+                onPress={async () => { await updateSettings({ voice: v.id }); speak(`Hi, I'm Alice. This is how I sound.`); }}>
+                {on
+                  ? <View style={{ borderRadius: 16, backgroundColor: C.violet, shadowColor: C.violet, shadowOpacity: 0.8, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }}>{inner}</View>
+                  : <Glass radius={16}>{inner}</Glass>}
+              </Pressable>
+            );
+          })}
+        </View>
+        <Btn kind="ghost" icon="volume-high-outline" title="Hear it again" onPress={() => speak(`Hi, I'm Alice. This is how I sound.`)} />
       </Card>
 
       <Card title="Voice">
@@ -91,7 +116,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.3.0. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.3.1. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

@@ -16,6 +16,7 @@ export type Settings = {
   confirmActions: boolean; // always ask before creating reminders/events/emails
   serverUrl: string; // blank = Alice's hosted server
   providerOverride: '' | 'gemini' | 'openai'; // testing only; server must allow it
+  voice: string; // a natural voice name from Alice's server, or 'iphone' for the built-in offline voice
 };
 
 /** AI models are chosen on Alice's server (server/src/config.mjs), not on the phone. */
@@ -35,6 +36,7 @@ export const DEFAULTS: Settings = {
   confirmActions: true,
   serverUrl: '',
   providerOverride: '',
+  voice: 'Sulafat',
 };
 
 let cache: Settings = DEFAULTS;

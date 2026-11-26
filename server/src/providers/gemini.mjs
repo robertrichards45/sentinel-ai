@@ -53,3 +53,37 @@ export async function transcribe({ audioBase64, mime }) {
   }, 45000);
   return { text: textOf(j).replace(/^"|"$/g, ''), usage: usage(j), model };
 }
+
+// Text-to-speech via the Interactions API (gemini-3.8-flash-tts). Returns a 24 kHz mono 16-bit WAV, base64.
+export async function speak({ text, voice, style }) {
+  const model = config.models.gemini.tts;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 45000);
+  try {
+    const item = { type: 'text', text };
+    if (style) item.annotations = [{ type: 'speech_metadata', style }];
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.keys.gemini },
+      body: JSON.stringify({ model, input: [{ type: 'user_input', content: [item] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${j.error?.message ?? 'speech failed'}`), { status: r.status });
+    const audio = findAudio(j);
+    if (!audio) throw new Error('Gemini returned no audio.');
+    return { audioBase64: audio.data, mime: audio.mime_type ?? audio.mimeType ?? 'audio/wav', model };
+  } finally { clearTimeout(t); }
+}
+
+/** Finds the last {type:'audio', data} block anywhere in the response (shape differs slightly between SDK docs). */
+export function findAudio(j) {
+  let found = null;
+  const walk = (v) => {
+    if (!v || typeof v !== 'object') return;
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (v.type === 'audio' && typeof v.data === 'string') found = v;
+    Object.values(v).forEach(walk);
+  };
+  walk(j?.output_audio ? { x: { type: 'audio', ...j.output_audio } } : j);
+  return found;
+}

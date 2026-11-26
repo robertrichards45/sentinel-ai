@@ -77,3 +77,10 @@ export async function serverStatus(): Promise<{ ok: boolean; providers: string[]
     return { ok: false, providers: [], detail: "Can't reach Alice's server." };
   }
 }
+
+/** Alice's natural voice: text -> WAV (base64) from the server. */
+export async function speechAudio(text: string, voice: string, style?: string): Promise<{ audioBase64: string; mime: string }> {
+  const j = await call('/v1/speak', { text, voice, style }, 30000);
+  if (!j.audioBase64) throw new AIError('No audio came back.');
+  return { audioBase64: j.audioBase64, mime: j.mime ?? 'audio/wav' };
+}
