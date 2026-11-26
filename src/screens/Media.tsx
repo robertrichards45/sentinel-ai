@@ -3,7 +3,7 @@ import { ScrollView, Text } from 'react-native';
 import { importFromFiles, ImportResult } from '../media';
 import { probeGlassesWifi } from '../wifiProbe';
 import { useGlasses } from '../hooks';
-import { Btn, C, Card, S } from '../ui';
+import { Btn, C, Card, S, Title } from '../ui';
 
 const COLOR: Record<ImportResult['status'], string> = { saved: C.good, duplicate: C.dim, damaged: C.bad, error: C.warn };
 
@@ -15,7 +15,7 @@ export default function Media() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
-      <Text style={S.h1}>Media</Text>
+      <Title>Media</Title>
       <Card title="On the glasses">
         <Text style={S.body}>{g.mediaCount !== undefined ? `${g.mediaCount} files stored, ${g.newMediaSinceImport} new since last import` : 'Connect the glasses to see the count.'}</Text>
       </Card>

@@ -3,7 +3,7 @@ import { Alert, ScrollView, Text, View } from 'react-native';
 import { memory } from '../memory';
 import { useMemory, useSettings } from '../hooks';
 import { updateSettings } from '../settings';
-import { Btn, C, Card, S, Toggle, Field } from '../ui';
+import { Btn, C, Card, S, Toggle, Field, Title } from '../ui';
 
 export default function Memory() {
   const m = useMemory();
@@ -12,7 +12,7 @@ export default function Memory() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
-      <Text style={S.h1}>Memory</Text>
+      <Title>Memory</Title>
       <Card>
         <Toggle label="Personal memory" hint='SENTINEL only remembers what you ask it to ("remember that…"). Stored on this iPhone only.' value={s.memoryEnabled} onChange={(v) => updateSettings({ memoryEnabled: v })} />
       </Card>

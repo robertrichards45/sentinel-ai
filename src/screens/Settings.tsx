@@ -9,7 +9,7 @@ import { KEY_NAME, testKey } from '../ai';
 import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
-import { Btn, C, Card, Field, Pill, S, Toggle } from '../ui';
+import { Btn, C, Card, Field, Pill, S, Toggle, Title } from '../ui';
 
 const STATUS_COLOR: Record<Status, string> = { tested: C.good, built: C.accent, partial: C.warn, blocked: C.bad, unsupported: C.dim, proposed: C.dim };
 
@@ -31,7 +31,7 @@ export default function Settings() {
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
-      <Text style={S.h1}>Settings</Text>
+      <Title>Settings</Title>
 
       <Card title="OpenAI" right={<Pill text={hasKey ? 'Key saved' : 'No key'} color={hasKey ? C.good : C.warn} />}>
         <Field label="API key (stored in iOS Keychain, this iPhone only)" value={key} onChange={setKey} secure placeholder="sk-…" />
@@ -86,7 +86,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>SENTINEL AI 0.1.1 · unofficial · not affiliated with the glasses maker</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>SENTINEL AI 0.2.0 · unofficial · not affiliated with the glasses maker</Text>
     </ScrollView>
   );
 }

@@ -2,14 +2,15 @@
   "expo": {
     "name": "SENTINEL AI",
     "slug": "sentinel-ai",
-    "version": "0.1.1",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#EEF1F4",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "CFBundleDisplayName": "SENTINEL AI",
         "NSBluetoothAlwaysUsageDescription": "SENTINEL AI connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
@@ -24,21 +25,73 @@
         "NSCalendarsFullAccessUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
         "NSCalendarsWriteOnlyAccessUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
         "NSCalendarsUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
-        "UIBackgroundModes": ["bluetooth-central", "audio"],
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "UIBackgroundModes": [
+          "bluetooth-central",
+          "audio"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
-      ["react-native-ble-plx", { "isBackgroundEnabled": true, "modes": ["central"], "bluetoothAlwaysPermission": "SENTINEL AI connects to your G2 glasses over Bluetooth." }],
-      ["expo-secure-store", { "faceIDPermission": "SENTINEL AI does not use Face ID." }],
-      ["expo-audio", { "microphonePermission": "SENTINEL AI uses the glasses' microphone for the voice assistant and translation." }],
-      ["expo-media-library", { "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.", "savePhotosPermission": "SENTINEL AI saves imported glasses media to your photo library.", "isAccessMediaLocationEnabled": false }],
-      ["expo-image-picker", { "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.", "cameraPermission": "SENTINEL AI takes a photo when you ask it what you're looking at or to read a document.", "microphonePermission": false }],
-      ["expo-location", { "locationWhenInUsePermission": "SENTINEL AI tells you where you are and starts directions when you ask.", "locationAlwaysAndWhenInUsePermission": "SENTINEL AI only uses your location while the app is open.", "isIosBackgroundLocationEnabled": false }],
-      ["expo-calendar", { "calendarPermission": "SENTINEL AI adds calendar events you ask for, after you confirm.", "remindersPermission": "SENTINEL AI creates reminders you ask for, after you confirm." }],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "SENTINEL AI connects to your G2 glasses over Bluetooth."
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "SENTINEL AI does not use Face ID."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "SENTINEL AI uses the glasses' microphone for the voice assistant and translation."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.",
+          "savePhotosPermission": "SENTINEL AI saves imported glasses media to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.",
+          "cameraPermission": "SENTINEL AI takes a photo when you ask it what you're looking at or to read a document.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SENTINEL AI tells you where you are and starts directions when you ask.",
+          "locationAlwaysAndWhenInUsePermission": "SENTINEL AI only uses your location while the app is open.",
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "SENTINEL AI adds calendar events you ask for, after you confirm.",
+          "remindersPermission": "SENTINEL AI creates reminders you ask for, after you confirm."
+        }
+      ],
       "expo-mail-composer",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font"
     ]
   }
 }
