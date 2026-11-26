@@ -150,7 +150,7 @@ class GlassesLink {
   syncAudio() {
     if (this.state !== 'connected') return;
     const want = getSettings().glassesAudio;
-    this.glassesCommand(want ? 'audioOn' : 'audioOff').catch(() => {});
+    if (want) this.glassesCommand('audioOn').catch(() => {}); // like the official app, never send audioOff
   }
 
   async disconnect() {

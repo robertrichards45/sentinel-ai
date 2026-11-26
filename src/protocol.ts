@@ -110,13 +110,15 @@ export const ssidFromMac = (m: string) => 'G2-' + m.replace(/:/g, '').slice(-4).
 
 /**
  * VERIFIED from the official app's traffic (iPhone Bluetooth log, see DIAGNOSTIC_LOG section 22), all on 57FF/33F5:
- *  audioOn:  the glasses then connect to the iPhone as normal Bluetooth headphones (A2DP + hands-free),
- *            about 1 s later. That is how the official app's spoken answers reach the glasses' speakers.
- *  audioOff: the matching "off" value of the same command (seen when the official app finished).
+ *  audioOn (07..00):  the glasses then connect to the iPhone as normal Bluetooth headphones (A2DP + hands-free).
+ *            That is how the official app's spoken answers reach the glasses' speakers. Verified twice
+ *            (official app 00:54, Alice 02:19 - capture 2026-11-26 02:32).
+ *  audioOff (07..01): the glasses drop that link within 0.5 s (Alice 02:28 capture). The official app never sends it.
+ *  NOTE: 0.8.0/0.8.1 had these two swapped.
  */
 export const GLASSES_COMMANDS = {
-  audioOn: '0700010001000100010000000000000000000000',
-  audioOff: '0700010001000100000000000000000000000000',
+  audioOn: '0700010001000100000000000000000000000000', // 07..00: glasses join as headphones ~1-5 s later (seen twice)
+  audioOff: '0700010001000100010000000000000000000000', // 07..01: glasses drop the headphones link within 0.5 s
   // Talking through the glasses (same capture): the official app answers a button press with ackButton,
   // then micOn; it sends micOff when you stop talking, micOn again after its spoken answer (follow-up),
   // and endSession when the conversation is over.
