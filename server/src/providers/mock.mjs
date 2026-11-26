@@ -12,3 +12,4 @@ export async function speak({ text, voice }) {
   b.writeUInt32LE(24000, 24); b.writeUInt32LE(48000, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(n * 2, 40);
   return { audioBase64: b.toString('base64'), mime: 'audio/wav', model: `mock-tts(${voice}:${text.length})` };
 }
+export async function liveToken() { return { token: 'auth_tokens/mock-live-token', model: 'mock-live', expiresAt: new Date(Date.now() + 1800000).toISOString() }; }

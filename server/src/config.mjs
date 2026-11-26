@@ -24,6 +24,8 @@ export const config = {
     'gemini-3.8-flash': [1.50, 9.00],
     'gemini-4-argon': [null, null],
   }),
+  // Real-time conversation (Gemini Live). The phone connects to Google directly with a short-lived token.
+  live: { model: env.GEMINI_LIVE_MODEL ?? 'gemini-3.8-live', perInstallPerDay: Number(env.LIVE_DAILY_LIMIT ?? 150) },
   // Natural voices for Alice (Gemini prebuilt voices). The app may pick any of these.
   voices: json(env.VOICES, ['Sulafat', 'Aoede', 'Achernar', 'Vindemiatrix', 'Kore', 'Leda', 'Puck', 'Achird', 'Charon', 'Algieba', 'Iapetus', 'Gacrux']),
   defaultVoice: env.DEFAULT_VOICE ?? 'Sulafat',

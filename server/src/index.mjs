@@ -6,6 +6,7 @@
 //                         audio = the user's spoken question (one round trip instead of transcribe + respond)
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
 //   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
+//   POST /v1/live         -> {token, model, expiresAt, endpoints[]}  short-lived token for real-time voice
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
 import { createServer } from 'node:http';
 import { config, costUsd } from './config.mjs';
@@ -65,6 +66,16 @@ export const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/v1/status') {
       return send(res, 200, { usage: usageSnapshot(), routes: config.routes, models: config.models, search: config.searchModes, voices: config.voices, defaultVoice: config.defaultVoice, providers: Object.keys(PROVIDERS).filter(hasKey) });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/v1/live') {
+      if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Real-time voice needs a Gemini key on the server.' });
+      if (!take('global-live', config.limits.globalPerDay)) return send(res, 429, { error: 'Alice is at today\'s capacity. Try again tomorrow.' });
+      if (!take('l:' + installId, config.live.perInstallPerDay)) return send(res, 429, { error: 'Conversation limit reached for today.' });
+      const t = await (config.mock ? mock : gemini).liveToken();
+      const base = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
+      const endpoints = ['v1beta', 'v1alpha'].map((v) => `${base}.${v}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token)}`);
+      return send(res, 200, { ...t, endpoints });
     }
 
     if (req.method === 'POST' && url.pathname === '/v1/speak') {
