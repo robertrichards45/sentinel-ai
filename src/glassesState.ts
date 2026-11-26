@@ -1,4 +1,4 @@
-import * as Speech from 'expo-speech';
+import { speak } from './voice';
 import { glasses, LinkState } from './ble';
 import { getSettings } from './settings';
 import { ssidFromMac } from './protocol';
@@ -38,13 +38,15 @@ glasses.on((e: any) => {
     case 'link': set({ link: e.state, linkDetail: e.detail }); break;
     case 'address': set({ mac: e.mac, ssid: ssidFromMac(e.mac) }); break;
     case 'mediaCount':
+      // A new photo/video was saved on the glasses (count only rises when a file is written).
+      if (s.mediaCount !== undefined && e.count > s.mediaCount && getSettings().announceRecording) speak(e.count - s.mediaCount > 1 ? 'Saved.' : 'Photo saved.');
       if (importedCount === undefined) importedCount = e.count;
       set({ mediaCount: e.count, newMediaSinceImport: Math.max(0, e.count - (importedCount ?? e.count)), lastPacket: now });
       break;
     case 'heartbeat': {
       set({ heartbeat: e.value, lastPacket: now });
       const lim = getSettings().lowBatteryAlert;
-      if (e.value <= lim && !lowWarned) { lowWarned = true; Speech.speak(`Glasses battery may be low, ${e.value} percent.`, { language: getSettings().voiceLanguage }); }
+      if (e.value <= lim && !lowWarned) { lowWarned = true; speak(`Your glasses battery is at ${e.value} percent.`); }
       if (e.value > lim + 5) lowWarned = false;
       break;
     }
@@ -52,11 +54,12 @@ glasses.on((e: any) => {
     case 'busy': {
       const rising = e.on && !s.busy;
       set({ busy: e.on, busySince: e.on ? now : undefined, lastPacket: now });
-      // The busy flag also rises when the glasses' AI microphone starts, so wait: if a voice
-      // recording begins (54 12 04) it is the mic, not the camera, and we stay quiet.
+      // The busy flag rises for a photo, a video AND the AI microphone, so don't announce it.
+      // Photos are announced when the photo count rises; a long busy with no voice is a video.
       if (rising && getSettings().announceRecording) {
         voiceSeen = false;
-        setTimeout(() => { if (s.busy && !voiceSeen) Speech.speak('Camera active.', { rate: 1.1, language: getSettings().voiceLanguage }); }, 4000);
+        const started = now;
+        setTimeout(() => { if (s.busy && s.busySince === started && !voiceSeen) speak('Recording video.'); }, 8000);
       }
       break;
     }

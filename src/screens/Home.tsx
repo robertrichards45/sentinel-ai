@@ -88,7 +88,7 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
 
       <Card title="Privacy">
         <Toggle label="Privacy mode" hint="Pauses all AI. Nothing leaves this iPhone." value={s.privacyMode} onChange={(v) => updateSettings({ privacyMode: v })} />
-        <Toggle label="Announce recording" hint={'Says "camera active" when the glasses start recording.'} value={s.announceRecording} onChange={(v) => updateSettings({ announceRecording: v })} />
+        <Toggle label="Announce photos and video" hint={'Alice says "Photo saved" after a photo and "Recording video" when a video starts.'} value={s.announceRecording} onChange={(v) => updateSettings({ announceRecording: v })} />
       </Card>
     </ScrollView>
   );
