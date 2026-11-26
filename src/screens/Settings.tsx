@@ -9,6 +9,7 @@ import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
 import { diaryEvents } from '../diary';
+import { previewLiveVoice } from '../live';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
@@ -34,6 +35,9 @@ export default function Settings() {
     await f.write(glasses.log.map((l) => JSON.stringify(l)).join('\n'));
     await Sharing.shareAsync(f.uri, { mimeType: 'text/plain', dialogTitle: 'Share Bluetooth log' });
   };
+
+  // Preview with the voice you will actually hear: the live conversation voice when Live conversation is on.
+  const preview = (text = "Hi, I'm Alice. This is how I sound.") => (s.liveConversation ? previewLiveVoice(text).catch(() => speak(text)) : speak(text));
 
   const exportDiary = async () => {
     const f = new File(Paths.cache, `alice-diary-${Date.now()}.jsonl`);
@@ -75,7 +79,7 @@ export default function Settings() {
             );
             return (
               <Pressable key={v.id} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${v.label}, ${v.feel}`}
-                onPress={async () => { await updateSettings({ voice: v.id }); speak(`Hi, I'm Alice. This is how I sound.`); }}>
+                onPress={async () => { await updateSettings({ voice: v.id }); preview(); }}>
                 {on
                   ? <View style={{ borderRadius: 16, backgroundColor: C.violet, shadowColor: C.violet, shadowOpacity: 0.8, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }}>{inner}</View>
                   : <Glass radius={16}>{inner}</Glass>}
@@ -86,7 +90,7 @@ export default function Settings() {
         <Text style={[S.dim, { fontFamily: F.medium, marginTop: 4 }]}>Style and accent</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {VOICE_STYLES.map((v) => (
-            <Chip key={v.id} on={s.voiceStyle === v.id} label={v.label} onPress={async () => { await updateSettings({ voiceStyle: v.id }); speak(`Hi, I'm Alice. This is how I sound.`); }} />
+            <Chip key={v.id} on={s.voiceStyle === v.id} label={v.label} onPress={async () => { await updateSettings({ voiceStyle: v.id }); preview(); }} />
           ))}
         </View>
         <View style={S.row}>
@@ -94,9 +98,9 @@ export default function Settings() {
           <Btn kind="ghost" title="−" onPress={() => updateSettings({ voicePitch: Math.max(-2, s.voicePitch - 1) })} />
           <Btn kind="ghost" title="+" onPress={() => updateSettings({ voicePitch: Math.min(2, s.voicePitch + 1) })} />
         </View>
-        <Text style={S.dim}>Natural voices follow style and pitch as directions, so results vary a little. The iPhone voice follows pitch exactly.</Text>
+        <Text style={S.dim}>Previews play in the same voice you hear in conversation. Pitch only applies when Live conversation is off.</Text>
         <View style={S.row}>
-          <Btn style={{ flex: 1 }} kind="ghost" icon="volume-high-outline" title="Hear it" onPress={() => speak(`Hi, I'm Alice. This is how I sound.`)} />
+          <Btn style={{ flex: 1 }} kind="ghost" icon="volume-high-outline" title="Hear it" onPress={() => preview()} />
           <Btn style={{ flex: 1 }} kind="ghost" title={perMode ? 'Done' : 'Voice per mode'} onPress={() => setPerMode(!perMode)} />
         </View>
         {perMode ? allModes().map((m) => (
@@ -170,7 +174,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.8. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.9. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

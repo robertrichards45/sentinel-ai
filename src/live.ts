@@ -31,11 +31,13 @@ const NATURAL = ['Sulafat', 'Aoede', 'Laomedeia', 'Achernar', 'Vindemiatrix', 'D
 
 /** Function declarations: what Alice may do during a live conversation. */
 const TOOLS = [
-  { name: 'remember', description: 'Save a fact the user explicitly asks you to remember.', parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING' } }, required: ['fact'] } },
+  { name: 'remember', description: 'Save a lasting fact about the user: ALWAYS call it when they tell you something about themselves worth knowing later (their car, family, job, home, likes, plans, preferences) or say remember. Write it as a short standalone sentence, e.g. "Drives a 2021 Dodge Charger".', parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING' } }, required: ['fact'] } },
   { name: 'reminder', description: 'Create an iPhone reminder. due is ISO 8601 with the user UTC offset.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, due: { type: 'STRING' } }, required: ['title'] } },
   { name: 'event', description: 'Add a calendar event.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' } }, required: ['title', 'start'] } },
   { name: 'email', description: 'Open an email draft for the user to send.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, subject: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['subject', 'body'] } },
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
+  { name: 'save_spot', description: 'Remember the user\'s current location, e.g. where they parked. label defaults to car.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
+  { name: 'find_spot', description: 'Where did I park / take me back to a saved spot. Opens walking directions.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
   { name: 'stop_listening', description: 'End the conversation and stop listening when the user says stop listening, go to sleep, that\'s all, be quiet, or similar.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'report_problem', description: 'Add a problem report to Alice\'s diagnostic log, in the user\'s words, when they say something went wrong ("log that", "that didn\'t work", "note a problem").', parameters: { type: 'OBJECT', properties: { text: { type: 'STRING' } }, required: ['text'] } },
   { name: 'weather', description: 'Live weather and forecast. Omit place for the user\'s current location.', parameters: { type: 'OBJECT', properties: { place: { type: 'STRING' }, days: { type: 'NUMBER' } } } },
@@ -44,6 +46,8 @@ const TOOLS = [
   { name: 'glasses_status', description: 'Glasses connection, battery and photo count.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'document', description: 'Create a document (letter, report, list, plan, resume...) as a PDF. content is the COMPLETE document in Markdown.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, content: { type: 'STRING' }, format: { type: 'STRING', enum: ['pdf', 'text'] } }, required: ['title', 'content'] } },
 ];
+
+const BARGE_RMS = 0.045; // phone-mic loudness of a close voice; Alice's echo from the glasses is well below this
 
 class LiveSession {
   private ws: WebSocket | null = null;
@@ -70,6 +74,9 @@ class LiveSession {
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
   spokeAt = 0;
+  private loudFrames = 0;
+  private bargeUntil = 0;
+  private muted = false; // drop the rest of a reply you cut off
   private set(s: LiveState, detail?: string) {
     if (s === 'error' || (s === 'listening' && this.state === 'connecting')) note(s === 'error' ? 'live-error' : 'live-connected', { detail, ms: Date.now() - this.t0 }); if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
@@ -138,6 +145,8 @@ class LiveSession {
       inputAudioTranscription: {}, outputAudioTranscription: {},
       sessionResumption: this.handle ? { handle: this.handle } : {},
       contextWindowCompression: { slidingWindow: {} },
+      // Fluid turn-taking: answer ~0.6 s after you stop; need a clear voice (not Alice's echo) to interrupt her.
+      realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_LOW', endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH', prefixPaddingMs: 200, silenceDurationMs: 600 } },
     } };
   }
 
@@ -167,11 +176,17 @@ class LiveSession {
     rec.onAudioReady({ sampleRate: 16000, bufferLength: 1600, channelCount: 1 }, ({ buffer }) => {
       const ws = this.ws;
       if (!ws || ws.readyState !== 1) return;
-      // Half-duplex: while Alice is talking (and 0.5 s after), don't send the mic. Through Bluetooth glasses the
-      // echo cancellation can't fully remove her own voice, so she heard herself and talked over you.
-      if (this.state === 'speaking' || Date.now() - this.spokeAt < 500) return;
       let f: Float32Array = buffer.getChannelData(0);
       if (buffer.sampleRate !== 16000) f = resampleLinear(f, buffer.sampleRate, 16000);
+      // While Alice talks, only YOUR voice gets through: her own voice leaking back (quiet at the phone mic) is
+      // dropped, a clear, close voice ("stop", "shut up", a new question) passes and interrupts her.
+      if (this.state === 'speaking' || Date.now() - this.spokeAt < 500) {
+        let e = 0; for (let i = 0; i < f.length; i++) e += f[i] * f[i];
+        const rms = Math.sqrt(e / Math.max(1, f.length));
+        if (rms > BARGE_RMS) this.loudFrames++; else this.loudFrames = 0;
+        if (this.loudFrames >= 2) this.bargeUntil = Date.now() + 2500;
+        if (Date.now() > this.bargeUntil) return;
+      }
       const pcm = floatToPcm16(f);
       ws.send(JSON.stringify({ realtimeInput: { audio: { data: Buffer.from(pcm.buffer as ArrayBuffer, pcm.byteOffset, pcm.byteLength).toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
     });
@@ -193,11 +208,11 @@ class LiveSession {
     if (m.toolCall?.functionCalls?.length) { this.handleTools(m.toolCall.functionCalls); return; }
     const sc = m.serverContent;
     if (!sc) return;
-    if (sc.interrupted) { this.newQueue(); this.flushAlice(); this.set('listening'); }
+    if (sc.interrupted) { this.muted = false; this.newQueue(); this.flushAlice(); this.set('listening'); }
     if (sc.inputTranscription?.text) { this.youBuf += sc.inputTranscription.text; if (this.state === 'listening') this.set('thinking'); }
     if (sc.outputTranscription?.text) this.aliceBuf += sc.outputTranscription.text;
     for (const p of sc.modelTurn?.parts ?? []) {
-      if (!p.inlineData?.data || !this.ctx || !this.queue) continue;
+      if (!p.inlineData?.data || !this.ctx || !this.queue || this.muted) continue;
       this.turnDone = false;
       const rate = Number(/rate=(\d+)/.exec(p.inlineData.mimeType ?? '')?.[1] ?? 24000);
       try {
@@ -208,6 +223,7 @@ class LiveSession {
     }
     if (sc.turnComplete) {
       this.turnDone = true;
+      if (this.muted) { this.muted = false; this.aliceBuf = ''; }
       this.flushYou(); this.flushAlice();
       if (!this.pending && this.state !== 'listening') this.set('listening');
     }
@@ -245,6 +261,12 @@ class LiveSession {
     return true;
   }
 
+  /** Cut Alice off mid-reply (glasses button pressed while she talks): silence now, drop the rest of this answer. */
+  cutOff() {
+    if (this.state !== 'speaking' && this.state !== 'thinking') return;
+    this.muted = true; this.newQueue(); this.flushAlice(); this.set('listening');
+  }
+
   async stop() {
     this.stopping = true;
     this.flushYou(); this.flushAlice();
@@ -280,3 +302,21 @@ export async function liveReady(ms = 10000): Promise<boolean> {
 
 // "Stop listening" (voice) ends the live conversation too, after Alice finishes her goodbye.
 whenSleeping(() => { if (live.state !== 'off') setTimeout(() => live.stop(), live.state === 'speaking' ? 2500 : 0); });
+
+/**
+ * Voice preview that sounds exactly like the conversation: plays a line through the SAME live voice
+ * (the separate text-to-speech voice used for previews before sounds noticeably different).
+ * Uses a running conversation if there is one, otherwise opens a short one without the microphone.
+ */
+export async function previewLiveVoice(line = "Hi, I'm Alice. This is how I sound in our conversations.") {
+  const fresh = live.state === 'off' || live.state === 'error';
+  if (!fresh) { await live.stop(); } // restart so the new voice/style is used
+  await live.start({ mic: false });
+  if (!(await liveReady())) return false;
+  live.sendText(`Say exactly this, in your own voice and style, and nothing else: "${line}"`);
+  const t = Date.now();
+  while (Date.now() - t < 8000 && live.state !== 'speaking') await new Promise((r) => setTimeout(r, 100));
+  while (Date.now() - t < 15000 && live.state === 'speaking') await new Promise((r) => setTimeout(r, 150));
+  if (fresh) await live.stop();
+  return true;
+}

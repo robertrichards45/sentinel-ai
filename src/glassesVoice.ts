@@ -16,7 +16,7 @@ import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
 import { live, liveReady } from './live';
 import { getSettings } from './settings';
-import { onSpeaking } from './voice';
+import { onSpeaking, stopSpeaking } from './voice';
 import { setSessionCheck } from './micState';
 import { isAsleep, wakeUp, whenSleeping } from './quiet';
 
@@ -26,7 +26,7 @@ export const onGlassesVoice = (l: Listener) => { listeners.add(l); return () => 
 const emit = <K extends keyof Listener>(k: K, v: Parameters<NonNullable<Listener[K]>>[0]) => listeners.forEach((l) => (l[k] as any)?.(v));
 
 const FRAME_MS = 40;
-const SILENCE_END_MS = 1200; // pause that ends your turn
+const SILENCE_END_MS = 900; // pause that ends your turn
 const FOLLOW_UP_MS = 7000; // how long Alice waits for a follow-up before ending the conversation
 const MAX_TURN_MS = 30000;
 
@@ -127,6 +127,12 @@ async function waitLiveReply(): Promise<number | null> {
 }
 
 glasses.on((e: any) => {
+  // Button pressed while Alice is talking: cut her off and listen to you instead.
+  if (e.kind === 'busy' && e.on && (live.state === 'speaking' || speaking)) {
+    note('cut-off', { by: 'glasses-button' });
+    live.cutOff(); stopSpeaking(); wakeUp();
+    return;
+  }
   if (e.kind === 'busy' && e.on && drive() && !session && !recording && !processing) {
     // Button pressed: answer it the way the official app does, then switch the glasses mic on.
     wakeUp(); // pressing the button is you asking for Alice

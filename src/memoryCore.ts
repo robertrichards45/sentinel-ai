@@ -40,3 +40,13 @@ export function memoryPrompt(m: MemoryState, now = new Date()): string {
   if (recentNotes.length) lines.push('Recent notes:\n' + recentNotes.map((n) => '- ' + n.text).join('\n'));
   return lines.join('\n\n');
 }
+
+/** Parse the fact-extractor's reply: a JSON array of short sentences (tolerates code fences / extra text). */
+export function parseLearned(reply: string): string[] {
+  const m = reply.match(/\[[\s\S]*\]/);
+  if (!m) return [];
+  try {
+    const arr = JSON.parse(m[0]);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string').map((x) => x.trim()).filter((x) => x.length >= 4 && x.length <= 200).slice(0, 10) : [];
+  } catch { return []; }
+}

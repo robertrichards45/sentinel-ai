@@ -1,3 +1,4 @@
+import { parseLearned } from '../src/memoryCore';
 // Unit tests for the pure modules, using the REAL files backed up from the glasses.
 // Run: npx tsx test/core.test.ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -160,5 +161,15 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
     check('Ogg file byte-identical to the one Gemini transcribed', h === '4d2e78283210e5ad7fc28f72905428da2b8e87ae8ea083b961cc48b06cf4eda6', h);
   } else console.log('SKIP  real glasses-voice log not on this machine');
 }
+// --- Long-term memory: fact extractor reply parsing ---
+{
+  const ok = (c: boolean, m: string) => check('memory parser: ' + m, c, 'failed');
+  ok(JSON.stringify(parseLearned('["Drives a 2021 Dodge Charger","Has a daughter named Mia"]')) === '["Drives a 2021 Dodge Charger","Has a daughter named Mia"]', 'plain array');
+  ok(parseLearned('```json\n["Works nights"]\n```').length === 1, 'code fence');
+  ok(parseLearned('[]').length === 0, 'empty');
+  ok(parseLearned('no facts').length === 0, 'no array');
+  ok(parseLearned('[1, "x", "Lives in Ohio"]').join() === 'Lives in Ohio', 'filters junk');
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

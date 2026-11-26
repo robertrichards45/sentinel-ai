@@ -1,3 +1,4 @@
+import { readJson, writeJson } from './storage';
 import { agendaText } from './agenda';
 import { goToSleep } from './quiet';
 import { note, flushDiary } from './diary';
@@ -91,6 +92,26 @@ export async function runAction(a: Action): Promise<string> {
       const [addr] = await Location.reverseGeocodeAsync(pos.coords);
       if (!addr) return `You are at latitude ${pos.coords.latitude.toFixed(4)}, longitude ${pos.coords.longitude.toFixed(4)}.`;
       return `You're near ${[addr.name, addr.street, addr.city].filter(Boolean).join(', ')}.`;
+    }
+    case 'save_spot': {
+      const p = await Location.requestForegroundPermissionsAsync();
+      if (p.status !== 'granted') return 'I need location permission to do that.';
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const [addr] = await Location.reverseGeocodeAsync(pos.coords).catch(() => [] as any[]);
+      const label = a.label || 'car';
+      const spots = await readJson<Record<string, any>>('spots.json', {});
+      spots[label.toLowerCase()] = { lat: pos.coords.latitude, lon: pos.coords.longitude, at: Date.now(), near: addr ? [addr.name, addr.street].filter(Boolean).join(', ') : '' };
+      await writeJson('spots.json', spots);
+      return `Saved where your ${label} is${addr?.street ? ', near ' + addr.street : ''}.`;
+    }
+    case 'find_spot': {
+      const spots = await readJson<Record<string, any>>('spots.json', {});
+      const label = (a.label || 'car').toLowerCase();
+      const s = spots[label] ?? Object.values(spots).sort((x: any, y: any) => y.at - x.at)[0];
+      if (!s) return 'I don\'t have a saved spot yet. Say "remember where I parked" next time.';
+      await Linking.openURL(`maps://?daddr=${s.lat},${s.lon}&dirflg=w`);
+      const ago = Math.round((Date.now() - s.at) / 60000);
+      return `Your ${a.label || 'car'} is ${s.near ? 'near ' + s.near : 'where you saved it'}, saved ${ago < 60 ? ago + ' minutes' : Math.round(ago / 60) + ' hours'} ago. Walking directions are in Apple Maps.`;
     }
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye
