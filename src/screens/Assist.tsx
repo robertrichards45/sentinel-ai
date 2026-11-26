@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useKeepAwake } from 'expo-keep-awake';
 import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
-import { onGlassesButton } from '../glassesState';
+import { onListenRequest } from '../triggers';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
@@ -38,6 +38,10 @@ export default function Assist() {
   const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
   const listeningRef = useRef(false);
   const pressingRef = useRef(false);
+  const handsFreeRef = useRef(false);
+  const pressedAt = useRef(0);
+  const vad = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [handsFree, setHandsFree] = useState(false);
   useEffect(() => onSpeaking(setSpeakingState), []);
 
   const run = async (o: Parameters<typeof ask>[0]) => {
@@ -47,21 +51,56 @@ export default function Assist() {
     finally { setBusy(false); }
   };
 
-  const start = async () => {
+  /** Hands-free: listen until you stop talking (1.4 s of quiet), give up after 7 s of silence, max 20 s. */
+  const watchSilence = () => {
+    const t0 = Date.now(); let heard = false; let quietSince = 0;
+    if (vad.current) clearInterval(vad.current);
+    vad.current = setInterval(() => {
+      if (!listeningRef.current) { clearInterval(vad.current!); vad.current = null; return; }
+      const db = rec.getStatus().metering ?? -160;
+      const now = Date.now();
+      if (db > -38) { heard = true; quietSince = 0; } else if (heard && !quietSince) quietSince = now;
+      if ((heard && quietSince && now - quietSince > 1400) || now - t0 > 20000) finish();
+      else if (!heard && now - t0 > 7000) { cancel(); }
+    }, 150);
+  };
+  const listenHandsFree = async () => {
+    if (listeningRef.current || busy) return;
+    handsFreeRef.current = true; setHandsFree(true);
+    pressingRef.current = true;
+    await start(true);
+    pressingRef.current = false;
+    if (listeningRef.current) watchSilence();
+  };
+  const cancel = async () => {
+    listeningRef.current = false; setListening(false); handsFreeRef.current = false; setHandsFree(false);
+    try { await rec.stop(); } catch {}
+  };
+  const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
+  useEffect(() => onListenRequest(listenHandsFree));
+
+  const start = async (fromHandsFree = false) => {
+    if (!fromHandsFree) { pressedAt.current = Date.now(); handsFreeRef.current = false; }
     pressingRef.current = true; setErr('');
     try {
       stopSpeaking();
       await enableVoiceSession();
       const fmt = await prepareRecorder(rec);
       setMic(`${await chooseInput(rec)}, ${fmt}`);
-      if (!pressingRef.current) return; // released while preparing: no stray recording
+      if (!pressingRef.current && !handsFreeRef.current) return; // cancelled while preparing: no stray recording
       rec.record();
       listeningRef.current = true; setListening(true);
+      if (handsFreeRef.current && !fromHandsFree) watchSilence(); // quick tap landed before the mic was ready
     } catch (e: any) { setErr(String(e?.message ?? e)); }
   };
-  const stop = async () => {
+  const stop = async (force = false) => {
     pressingRef.current = false;
+    const quickTap = !force && Date.now() - pressedAt.current < 400;
+    // A quick tap (not a hold) switches to hands-free: keep listening until you stop talking.
+    if (quickTap && !handsFreeRef.current) { handsFreeRef.current = true; setHandsFree(true); if (listeningRef.current) watchSilence(); return; }
     if (!listeningRef.current) return;
+    if (!force && handsFreeRef.current) return;
+    if (vad.current) { clearInterval(vad.current); vad.current = null; }
     listeningRef.current = false; setListening(false);
     await rec.stop();
     let image: string | undefined;
@@ -69,8 +108,6 @@ export default function Assist() {
     if (rec.uri) run({ audioUri: rec.uri, imageBase64: image });
   };
 
-  // EXPERIMENTAL: glasses button (busy-flag edge) toggles listening
-  useEffect(() => { const off = onGlassesButton(() => (listeningRef.current ? stop() : start())); return () => { off(); }; });
 
   const snap = async (fromLibrary: boolean): Promise<string | undefined> => {
     const opts: ImagePicker.ImagePickerOptions = { base64: true, quality: 0.6, mediaTypes: ['images'] };
@@ -82,7 +119,7 @@ export default function Assist() {
   };
 
   const state: OrbState = listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
-  const status = listening ? 'Listening… let go to send' : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Hold Alice to talk';
+  const status = listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
   const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
 
   return (
@@ -105,7 +142,7 @@ export default function Assist() {
       </ScrollView>
 
       <View style={{ alignItems: 'center', gap: 6 }}>
-        <Pressable onPressIn={start} onPressOut={stop} onPress={() => speaking && stopSpeaking()}
+        <Pressable onPressIn={() => (listeningRef.current && handsFreeRef.current ? finish() : start())} onPressOut={() => stop()} onPress={() => speaking && stopSpeaking()}
           accessibilityRole="button" accessibilityLabel={listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
           <Orb size={250} state={state} />
         </Pressable>

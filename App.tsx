@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -20,6 +20,8 @@ import { memory } from './src/memory';
 import { loadModes } from './src/modeStore';
 import { glasses } from './src/ble';
 import { useGlasses } from './src/hooks';
+import { onGlassesButton } from './src/glassesState';
+import { requestListen, isTalkLink } from './src/triggers';
 import { Backdrop, Orb } from './src/Orb';
 import { C, F, Glass, Ionicons } from './src/ui';
 
@@ -71,6 +73,12 @@ function Shell() {
       setReady(true);
       glasses.connect().catch(() => {}); // automatic connection on launch
     })();
+    // Hands-free starts: alice://talk (Siri shortcut, Action Button) and the glasses' button.
+    const talk = () => { setTab('assist'); requestListen(); };
+    Linking.getInitialURL().then((u) => { if (isTalkLink(u)) talk(); });
+    const sub = Linking.addEventListener('url', ({ url }) => { if (isTalkLink(url)) talk(); });
+    const offBtn = onGlassesButton(talk);
+    return () => { sub.remove(); offBtn(); };
   }, []);
 
   const screens: Record<Tab, React.ReactNode> = {

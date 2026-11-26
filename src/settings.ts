@@ -17,6 +17,9 @@ export type Settings = {
   serverUrl: string; // blank = Alice's hosted server
   providerOverride: '' | 'gemini' | 'openai'; // testing only; server must allow it
   voice: string; // a natural voice name from Alice's server, or 'iphone' for the built-in offline voice
+  voiceStyle: string; // id from VOICE_STYLES in voice.ts
+  voicePitch: number; // -2 (deeper) .. +2 (higher)
+  modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
 };
 
 /** AI models are chosen on Alice's server (server/src/config.mjs), not on the phone. */
@@ -37,6 +40,9 @@ export const DEFAULTS: Settings = {
   serverUrl: '',
   providerOverride: '',
   voice: 'Sulafat',
+  voiceStyle: 'natural',
+  voicePitch: 0,
+  modeVoices: {},
 };
 
 let cache: Settings = DEFAULTS;

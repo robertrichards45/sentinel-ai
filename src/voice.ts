@@ -11,9 +11,9 @@ import { getSettings } from './settings';
  */
 export const VOICE_PRESET = RecordingPresets.HIGH_QUALITY;
 export const VOICE_CANDIDATES = [
-  { label: 'AAC 44.1 kHz mono 64 kbps', options: { ...RecordingPresets.HIGH_QUALITY, numberOfChannels: 1, bitRate: 64000 } },
-  { label: 'AAC 44.1 kHz stereo 128 kbps (stock)', options: RecordingPresets.HIGH_QUALITY },
-  { label: 'AAC low quality (stock)', options: RecordingPresets.LOW_QUALITY },
+  { label: 'AAC 44.1 kHz mono 64 kbps', options: { ...RecordingPresets.HIGH_QUALITY, numberOfChannels: 1, bitRate: 64000, isMeteringEnabled: true } },
+  { label: 'AAC 44.1 kHz stereo 128 kbps (stock)', options: { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true } },
+  { label: 'AAC low quality (stock)', options: { ...RecordingPresets.LOW_QUALITY, isMeteringEnabled: true } },
 ];
 
 /** Prepare the recorder with the first settings iOS accepts. Returns the label used. */
@@ -81,15 +81,28 @@ export const VOICES: { id: string; label: string; feel: string }[] = [
 let player: AudioPlayer | null = null;
 let generation = 0; // a newer speak()/stop cancels older ones
 
-function styleFor(rate: number): string {
-  const pace = rate >= 1.25 ? 'at a brisk pace' : rate <= 0.8 ? 'slowly and calmly' : 'at a natural conversational pace';
-  return `warm, natural and friendly, like a helpful companion, ${pace}`;
+/** How Alice delivers her lines. Sent to the voice model as a short style direction. */
+export const VOICE_STYLES: { id: string; label: string; style: string }[] = [
+  { id: 'natural', label: 'Natural', style: 'warm, natural and friendly, like a helpful companion' },
+  { id: 'american', label: 'American', style: 'friendly, with a natural General American accent' },
+  { id: 'british', label: 'British', style: 'friendly, with a natural British (Received Pronunciation) accent' },
+  { id: 'futuristic', label: 'Futuristic AI', style: 'calm, precise and slightly synthetic, like an advanced AI system' },
+  { id: 'refined', label: 'Refined British AI', style: 'polished, dry-witted and composed, like a refined British AI butler' },
+  { id: 'calm', label: 'Calm', style: 'soft, slow and soothing' },
+  { id: 'energetic', label: 'Energetic', style: 'upbeat, bright and enthusiastic' },
+];
+
+function styleFor(styleId: string, rate: number, pitch: number): string {
+  const base = (VOICE_STYLES.find((v) => v.id === styleId) ?? VOICE_STYLES[0]).style;
+  const pace = rate >= 1.25 ? 'at a brisk pace' : rate <= 0.8 ? 'slowly' : 'at a natural pace';
+  const tone = pitch <= -2 ? ', with a much deeper, lower pitch' : pitch === -1 ? ', slightly lower pitched' : pitch === 1 ? ', slightly higher pitched' : pitch >= 2 ? ', with a noticeably higher pitch' : '';
+  return `${base}, ${pace}${tone}`;
 }
 
-function speakIphone(text: string, language: string, rate: number, gen: number): Promise<void> {
+function speakIphone(text: string, language: string, rate: number, pitch: number, gen: number): Promise<void> {
   return new Promise((resolve) => {
     if (gen !== generation) return resolve();
-    Speech.speak(text, { language, rate, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
+    Speech.speak(text, { language, rate, pitch: 1 + pitch * 0.12, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
   });
 }
 
@@ -111,22 +124,23 @@ async function playWav(base64: string, gen: number): Promise<void> {
   });
 }
 
-export function speak(text: string, language?: string): Promise<void> {
+export function speak(text: string, language?: string, modeId?: string): Promise<void> {
   const s = getSettings();
+  const voice = (modeId && s.modeVoices[modeId]) || s.voice;
   const gen = ++generation;
   stopPlayback();
   setSpeaking(true);
   const lang = language ?? s.voiceLanguage;
   const run = async () => {
-    if (s.voice !== 'iphone' && !s.privacyMode) {
+    if (voice !== 'iphone' && !s.privacyMode) {
       try {
-        const a = await speechAudio(text.slice(0, 3000), s.voice, styleFor(s.speechRate));
+        const a = await speechAudio(text.slice(0, 3000), voice, styleFor(s.voiceStyle, s.speechRate, s.voicePitch));
         if (gen !== generation) return;
         await playWav(a.audioBase64, gen);
         return;
       } catch { /* offline, quota or server issue: fall back to the iPhone voice */ }
     }
-    await speakIphone(text, lang, s.speechRate, gen);
+    await speakIphone(text, lang, s.speechRate, s.voicePitch, gen);
   };
   return run().finally(() => { if (gen === generation) setSpeaking(false); });
 }

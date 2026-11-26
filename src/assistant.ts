@@ -32,13 +32,13 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
 
   const offline = !opts.imageBase64 && mode.id !== 'translator' ? offlineAnswer(you) : null;
   if (offline) {
-    await speak(offline);
+    await speak(offline, undefined, mode.id);
     return { you, alice: offline, outcomes: [], mode: mode.id, t: Date.now() };
   }
 
   if (mode.id === 'translator') {
     const out = await respond(mode.id, `${mode.prompt}\nTarget language: ${s.translateTo}. Return only the translated text.`, [], you);
-    await speak(out.text, localeFor(s.translateTo));
+    await speak(out.text, localeFor(s.translateTo), mode.id);
     return { you, alice: out.text, outcomes: [], mode: mode.id, t: Date.now(), via: `${out.provider} · ${out.model}`, ms: out.ms };
   }
 
@@ -49,11 +49,11 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
   const turn = parseAssistantTurn(ans.text, allModes().map((m) => m.id));
 
   const outcomes: string[] = [];
-  if (turn.reply) await speak(mode.speakFull ? turn.reply : turn.reply.slice(0, 1200));
+  if (turn.reply) await speak(mode.speakFull ? turn.reply : turn.reply.slice(0, 1200), undefined, mode.id);
   for (const a of turn.actions) {
     try { outcomes.push(await runAction(a)); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
   }
-  if (outcomes.length) await speak(outcomes.join(' '));
+  if (outcomes.length) await speak(outcomes.join(' '), undefined, mode.id);
   if (s.memoryEnabled) { await memory.turn('user', question); await memory.turn('assistant', turn.reply); }
   return { you: question, alice: turn.reply, outcomes, mode: mode.id, t: Date.now(), via: `${ans.provider} · ${ans.model}`, ms: ans.ms, sources: ans.sources };
 }

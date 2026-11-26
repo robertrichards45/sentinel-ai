@@ -9,7 +9,8 @@ import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
-import { VOICES, speak } from '../voice';
+import { VOICES, VOICE_STYLES, speak } from '../voice';
+import { allModes } from '../modeStore';
 
 const STATUS_COLOR: Record<Status, string> = { tested: C.mint, built: C.violet, partial: C.amber, blocked: C.red, unsupported: C.sub, proposed: C.sub };
 
@@ -20,6 +21,7 @@ export default function Settings() {
   const [pack, setPack] = useState('');
   const [showMatrix, setShowMatrix] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  const [perMode, setPerMode] = useState(false);
   const check = () => { setSrv(null); serverStatus().then(setSrv); };
   useEffect(check, [s.serverUrl]);
 
@@ -71,7 +73,40 @@ export default function Settings() {
             );
           })}
         </View>
-        <Btn kind="ghost" icon="volume-high-outline" title="Hear it again" onPress={() => speak(`Hi, I'm Alice. This is how I sound.`)} />
+        <Text style={[S.dim, { fontFamily: F.medium, marginTop: 4 }]}>Style and accent</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {VOICE_STYLES.map((v) => (
+            <Chip key={v.id} on={s.voiceStyle === v.id} label={v.label} onPress={async () => { await updateSettings({ voiceStyle: v.id }); speak(`Hi, I'm Alice. This is how I sound.`); }} />
+          ))}
+        </View>
+        <View style={S.row}>
+          <Text style={[S.body, { flex: 1 }]}>Pitch {s.voicePitch === 0 ? 'normal' : s.voicePitch < 0 ? `deeper ${-s.voicePitch}` : `higher ${s.voicePitch}`}</Text>
+          <Btn kind="ghost" title="−" onPress={() => updateSettings({ voicePitch: Math.max(-2, s.voicePitch - 1) })} />
+          <Btn kind="ghost" title="+" onPress={() => updateSettings({ voicePitch: Math.min(2, s.voicePitch + 1) })} />
+        </View>
+        <Text style={S.dim}>Natural voices follow style and pitch as directions, so results vary a little. The iPhone voice follows pitch exactly.</Text>
+        <View style={S.row}>
+          <Btn style={{ flex: 1 }} kind="ghost" icon="volume-high-outline" title="Hear it" onPress={() => speak(`Hi, I'm Alice. This is how I sound.`)} />
+          <Btn style={{ flex: 1 }} kind="ghost" title={perMode ? 'Done' : 'Voice per mode'} onPress={() => setPerMode(!perMode)} />
+        </View>
+        {perMode ? allModes().map((m) => (
+          <View key={m.id} style={{ gap: 6, borderTopWidth: 1, borderColor: C.line, paddingTop: 8 }}>
+            <Text style={S.body}>{m.name}: {s.modeVoices[m.id] ? VOICES.find((v) => v.id === s.modeVoices[m.id])?.label : 'main voice'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              <Chip on={!s.modeVoices[m.id]} label="Main" onPress={() => { const mv = { ...s.modeVoices }; delete mv[m.id]; updateSettings({ modeVoices: mv }); }} />
+              {VOICES.map((v) => (
+                <Chip key={v.id} on={s.modeVoices[m.id] === v.id} label={v.label}
+                  onPress={async () => { await updateSettings({ modeVoices: { ...s.modeVoices, [m.id]: v.id } }); speak(`This is ${m.name} mode.`, undefined, m.id); }} />
+              ))}
+            </ScrollView>
+          </View>
+        )) : null}
+      </Card>
+
+      <Card title="Start Alice hands-free">
+        <Text style={S.dim}>Make a Siri shortcut: open Shortcuts, tap +, add "Open URLs" with alice://talk, and name it "Alice". Then say "Hey Siri, Alice" (through the glasses if they're your headphones). Alice opens and listens until you stop talking.</Text>
+        <Text style={S.dim}>You can also put that shortcut on the Action Button or Back Tap. The glasses' own button needs one Bluetooth capture first (see the guide).</Text>
+        <Toggle label="Glasses button starts Alice (experimental)" hint="Uses the camera-busy signal; may also fire when you take a photo." value={s.buttonTriggersAssistant} onChange={(v) => updateSettings({ buttonTriggersAssistant: v })} />
       </Card>
 
       <Card title="Voice">
@@ -87,7 +122,6 @@ export default function Settings() {
 
       <Card title="Behaviour">
         <Toggle label="Confirm before reminders, events, navigation" value={s.confirmActions} onChange={(v) => updateSettings({ confirmActions: v })} />
-        <Toggle label="Glasses button starts Alice (experimental)" hint="Uses the camera-busy signal; may also fire when you take a photo." value={s.buttonTriggersAssistant} onChange={(v) => updateSettings({ buttonTriggersAssistant: v })} />
         <View style={S.row}>
           <Text style={[S.body, { flex: 1 }]}>Low battery alert at {s.lowBatteryAlert}%</Text>
           <Btn kind="ghost" title="−" onPress={() => updateSettings({ lowBatteryAlert: Math.max(5, s.lowBatteryAlert - 5) })} />
@@ -116,7 +150,16 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.3.1. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.4.0. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
+  );
+}
+
+function Chip({ on, label, onPress }: { on: boolean; label: string; onPress: () => void }) {
+  const t = <Text style={{ color: on ? '#FFFFFF' : C.ink, fontFamily: on ? F.semibold : F.regular, fontSize: 14, paddingVertical: 7, paddingHorizontal: 12 }}>{label}</Text>;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={label}>
+      {on ? <View style={{ borderRadius: 999, backgroundColor: C.violet }}>{t}</View> : <Glass radius={999}>{t}</Glass>}
+    </Pressable>
   );
 }
