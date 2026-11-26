@@ -23,6 +23,7 @@ import { useGlasses } from './src/hooks';
 import { onGlassesButton } from './src/glassesState';
 import { requestListen, isTalkLink, onWake } from './src/triggers';
 import { wakeWordReady } from './src/wakeWord';
+import './src/headsUp';
 import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';

@@ -40,6 +40,7 @@ const TOOLS = [
   { name: 'report_problem', description: 'Add a problem report to Alice\'s diagnostic log, in the user\'s words, when they say something went wrong ("log that", "that didn\'t work", "note a problem").', parameters: { type: 'OBJECT', properties: { text: { type: 'STRING' } }, required: ['text'] } },
   { name: 'weather', description: 'Live weather and forecast. Omit place for the user\'s current location.', parameters: { type: 'OBJECT', properties: { place: { type: 'STRING' }, days: { type: 'NUMBER' } } } },
   { name: 'where_am_i', description: "Tell the user where they are (street/city).", parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'agenda', description: 'What is coming up: calendar events and reminders for the next N days (default 7). Use for "what do I have today/this week/on Tuesday".', parameters: { type: 'OBJECT', properties: { days: { type: 'NUMBER' } } } },
   { name: 'glasses_status', description: 'Glasses connection, battery and photo count.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'document', description: 'Create a document (letter, report, list, plan, resume...) as a PDF. content is the COMPLETE document in Markdown.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, content: { type: 'STRING' }, format: { type: 'STRING', enum: ['pdf', 'text'] } }, required: ['title', 'content'] } },
 ];
@@ -125,6 +126,7 @@ class LiveSession {
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
       mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
+      'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS use Google Search first and answer from what you find. Never say you cannot access current information.`,
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
     ].filter(Boolean).join('\n\n');

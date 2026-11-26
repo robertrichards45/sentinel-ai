@@ -16,6 +16,7 @@ export type Action =
   | { type: 'report_problem'; text: string }
   | { type: 'stop_listening' }
   | { type: 'glasses_status' }
+  | { type: 'agenda'; days?: number }
   | { type: 'set_mode'; mode: string }
   | { type: 'document'; title: string; format: 'pdf' | 'text'; content: string };
 
@@ -62,6 +63,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
       return { type: 'weather', ...(place ? { place } : {}), ...(Number.isFinite(d) && d >= 1 && d <= 7 ? { days: Math.round(d) } : {}) };
     }
     case 'glasses_status': return { type: 'glasses_status' };
+    case 'agenda': { const d = Number(a.days); return Number.isFinite(d) && d >= 1 && d <= 31 ? { type: 'agenda', days: Math.round(d) } : { type: 'agenda' }; }
     case 'stop_listening': return { type: 'stop_listening' };
     case 'report_problem': { const text = str(a.text, 600); return text ? { type: 'report_problem', text } : null; }
     case 'set_mode': return knownModes.includes(a.mode) ? { type: 'set_mode', mode: a.mode } : null;
@@ -106,8 +108,10 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"stop_listening"}   when the user says stop listening, go to sleep, that's all, leave me alone, be quiet, or ends the conversation
 {"type":"report_problem","text":"what went wrong, in the user's words"}   when the user reports a problem or bug with you, the app or the glasses ("note that...", "log a problem", "that didn't work")
 {"type":"glasses_status"}
+{"type":"agenda","days":7}   what's coming up / what do I have today, this week, on Tuesday (calendar + reminders)
 {"type":"set_mode","mode":"<mode id>"}
 {"type":"document","title":"...","format":"pdf|text","content":"<the COMPLETE document in Markdown: # title, ## headings, - lists, | tables |>"}
    use when the user asks you to write, create, draft or make a document, letter, report, list, plan, resume or similar.
    Put the whole document in "content"; in "reply" just say briefly what you made (do not read the document aloud).
+When the user mentions a meeting, appointment or anything with a date ("I have a meeting Tuesday"), add it with an event action; if no time was given, ask what time first. Use a reminder for to-dos ("remind me to call mom at 6").
 Never invent facts about the user. Never claim an action is done; the app confirms it.`;

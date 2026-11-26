@@ -1,3 +1,4 @@
+import { agendaText } from './agenda';
 import { goToSleep } from './quiet';
 import { note, flushDiary } from './diary';
 import { Alert, Linking } from 'react-native';
@@ -65,7 +66,8 @@ export async function runAction(a: Action): Promise<string> {
       const list = lists.find((c: any) => c.allowsModifications) ?? lists[0];
       if (!list) return 'No reminders list found on this iPhone.';
       await list.createReminder({ title: a.title, ...(a.due ? { dueDate: new Date(a.due), alarms: [{ relativeOffset: 0 }] } : {}) } as any);
-      return `Reminder created${a.due ? ' for ' + fmt(a.due) : ''}.`;
+      if (getSettings().memoryEnabled && a.due) memory.note(`Reminder: "${a.title}" at ${fmt(a.due)}`).catch(() => {});
+      return `Reminder set${a.due ? ' for ' + fmt(a.due) + ". Your phone will alert you then" : ''}.`;
     }
     case 'event': {
       const start = new Date(a.start), end = new Date(start.getTime() + a.durationMin * 60000);
@@ -73,8 +75,9 @@ export async function runAction(a: Action): Promise<string> {
       const p = await Calendar.requestCalendarPermissions();
       if (p.status !== 'granted') return 'I need Calendar permission to do that.';
       const cal = Calendar.getDefaultCalendarSync();
-      await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms: [{ relativeOffset: -15 }] } as any);
-      return `Added ${a.title} on ${start.toLocaleString()}.`;
+      await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms: [{ relativeOffset: -1440 }, { relativeOffset: -60 }, { relativeOffset: -15 }] } as any);
+      if (getSettings().memoryEnabled) memory.note(`Has "${a.title}" on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`).catch(() => {});
+      return `Added ${a.title} on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. I'll remind you the day before, an hour before and 15 minutes before.`;
     }
     case 'email': {
       if (!(await MailComposer.isAvailableAsync())) return 'Mail is not set up on this iPhone.';
@@ -124,6 +127,8 @@ export async function runAction(a: Action): Promise<string> {
     }
     case 'glasses_status':
       return glassesStatusText();
+    case 'agenda':
+      return agendaText(a.days ?? 7);
     case 'set_mode':
       await updateSettings({ activeMode: a.mode });
       return `Switched to ${a.mode} mode.`;
