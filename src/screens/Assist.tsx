@@ -13,6 +13,7 @@ import { live, LiveState, LiveLine } from '../live';
 import { onGlassesVoice } from '../glassesVoice';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
+import { setPhoneMic } from '../micState';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
 import { Orb, VoiceBars, OrbState } from '../Orb';
 import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
@@ -101,6 +102,7 @@ export default function Assist() {
   const cancel = async () => {
     listeningRef.current = false; setListening(false); handsFreeRef.current = false; setHandsFree(false);
     try { await rec.stop(); } catch {}
+    setPhoneMic(false);
   };
   const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
   useEffect(() => onListenRequest(() => (s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
@@ -114,7 +116,7 @@ export default function Assist() {
       const fmt = await prepareRecorder(rec);
       setMic(`${await chooseInput(rec)}, ${fmt}`);
       if (!pressingRef.current && !handsFreeRef.current) return; // cancelled while preparing: no stray recording
-      rec.record();
+      rec.record(); setPhoneMic(true);
       listeningRef.current = true; setListening(true);
       if (handsFreeRef.current && !fromHandsFree) watchSilence(); // quick tap landed before the mic was ready
     } catch (e: any) { setErr(String(e?.message ?? e)); }
@@ -128,7 +130,7 @@ export default function Assist() {
     if (!force && handsFreeRef.current) return;
     if (vad.current) { clearInterval(vad.current); vad.current = null; }
     listeningRef.current = false; setListening(false);
-    await rec.stop();
+    await rec.stop(); setPhoneMic(false);
     // Voice never opens the camera by itself; in photo modes the last photo you took is reused.
     if (rec.uri) run({ audioUri: rec.uri, imageBase64: mode.wantsImage ? lastPhoto.current : undefined });
   };

@@ -1,3 +1,4 @@
+import { appMicBusy } from './micState';
 import { speak } from './voice';
 import { glasses, LinkState } from './ble';
 import { getSettings } from './settings';
@@ -59,10 +60,10 @@ glasses.on((e: any) => {
       set({ busy: e.on, busySince: e.on ? now : undefined, lastPacket: now, ...(e.on ? {} : { aiListening: false }) });
       // The busy flag rises for a photo, a video AND the AI microphone, so don't announce it.
       // Photos are announced when the photo count rises; a long busy with no voice is a video.
-      if (rising && getSettings().announceRecording) {
+      if (rising && getSettings().announceRecording && !appMicBusy()) {
         voiceSeen = false;
         const started = now;
-        setTimeout(() => { if (s.busy && s.busySince === started && !voiceSeen) speak('Recording video.'); }, 8000);
+        setTimeout(() => { if (s.busy && s.busySince === started && !voiceSeen && !appMicBusy()) speak('Recording video.'); }, 8000);
       }
       break;
     }

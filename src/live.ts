@@ -1,3 +1,4 @@
+import { setPhoneMic } from './micState';
 /**
  * Real-time conversation with Alice (Gemini Live), ChatGPT-voice style:
  * the microphone streams continuously, Alice answers in ~1-2 s, and you can interrupt her.
@@ -63,7 +64,7 @@ class LiveSession {
   /** Screens subscribe while visible; the conversation itself keeps running (other tabs, locked phone). */
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
-  private set(s: LiveState, detail?: string) { this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+  private set(s: LiveState, detail?: string) { setPhoneMic(s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
   async start() {
     if (this.state !== 'off' && this.state !== 'error') return;
