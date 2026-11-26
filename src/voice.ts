@@ -74,16 +74,18 @@ const setSpeaking = (on: boolean) => speakingListeners.forEach((f) => f(on));
 export const VOICES: { id: string; label: string; feel: string }[] = [
   { id: 'Sulafat', label: 'Sulafat', feel: 'Warm' },
   { id: 'Aoede', label: 'Aoede', feel: 'Breezy' },
+  { id: 'Laomedeia', label: 'Laomedeia', feel: 'Upbeat' },
   { id: 'Achernar', label: 'Achernar', feel: 'Soft' },
   { id: 'Vindemiatrix', label: 'Vindemiatrix', feel: 'Gentle' },
-  { id: 'Kore', label: 'Kore', feel: 'Firm' },
+  { id: 'Despina', label: 'Despina', feel: 'Smooth & silky' },
+  { id: 'Gacrux', label: 'Gacrux', feel: 'Deep & mature' },
+  { id: 'Kore', label: 'Kore', feel: 'Low & firm' },
+  { id: 'Callirrhoe', label: 'Callirrhoe', feel: 'Easy-going' },
+  { id: 'Erinome', label: 'Erinome', feel: 'Clear' },
   { id: 'Leda', label: 'Leda', feel: 'Youthful' },
-  { id: 'Puck', label: 'Puck', feel: 'Upbeat' },
-  { id: 'Achird', label: 'Achird', feel: 'Friendly' },
-  { id: 'Charon', label: 'Charon', feel: 'Informative' },
-  { id: 'Algieba', label: 'Algieba', feel: 'Smooth' },
-  { id: 'Iapetus', label: 'Iapetus', feel: 'Clear' },
-  { id: 'Gacrux', label: 'Gacrux', feel: 'Mature' },
+  { id: 'Zephyr', label: 'Zephyr', feel: 'Bright' },
+  { id: 'Autonoe', label: 'Autonoe', feel: 'Bright & crisp' },
+  { id: 'Pulcherrima', label: 'Pulcherrima', feel: 'Bold' },
   { id: 'iphone', label: 'iPhone voice', feel: 'Offline, instant' },
 ];
 
@@ -98,6 +100,9 @@ export const VOICE_STYLES: { id: string; label: string; style: string }[] = [
   { id: 'futuristic', label: 'Futuristic AI', style: 'calm, precise and slightly synthetic, like an advanced AI system' },
   { id: 'refined', label: 'Refined British AI', style: 'polished, dry-witted and composed, like a refined British AI butler' },
   { id: 'calm', label: 'Calm', style: 'soft, slow and soothing' },
+  { id: 'sultry', label: 'Sultry', style: 'low, smooth and sultry, warm and intimate, unhurried, with a hint of a smile' },
+  { id: 'velvet', label: 'Late night', style: 'deep, husky and relaxed, quiet late-night radio host, close to the microphone' },
+  { id: 'playful', label: 'Playful', style: 'playful, teasing and confident, with a smile in her voice' },
   { id: 'energetic', label: 'Energetic', style: 'upbeat, bright and enthusiastic' },
 ];
 

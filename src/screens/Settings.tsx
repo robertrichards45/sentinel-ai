@@ -154,7 +154,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.6.0. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.6.1. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

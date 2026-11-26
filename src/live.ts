@@ -17,13 +17,14 @@ import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
 import { floatToPcm16, resampleLinear } from './liveCore';
+import { VOICE_STYLES } from './voice';
 
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 export type LiveLine = { who: 'you' | 'alice' | 'done'; text: string; t: number };
 type Events = { state: (s: LiveState, detail?: string) => void; line: (l: LiveLine) => void };
 type Sub = Partial<Events>;
 
-const NATURAL = ['Sulafat', 'Aoede', 'Achernar', 'Vindemiatrix', 'Kore', 'Leda', 'Puck', 'Achird', 'Charon', 'Algieba', 'Iapetus', 'Gacrux'];
+const NATURAL = ['Sulafat', 'Aoede', 'Laomedeia', 'Achernar', 'Vindemiatrix', 'Despina', 'Gacrux', 'Kore', 'Callirrhoe', 'Erinome', 'Leda', 'Zephyr', 'Autonoe', 'Pulcherrima'];
 
 /** Function declarations: what Alice may do during a live conversation. */
 const TOOLS = [
@@ -97,8 +98,10 @@ class LiveSession {
     const s = getSettings();
     const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
     const voice = NATURAL.includes((s.modeVoices[mode.id] || s.voice)) ? (s.modeVoices[mode.id] || s.voice) : 'Sulafat';
+    const tone = VOICE_STYLES.find((v) => v.id === s.voiceStyle);
     const prompt = [
       mode.prompt,
+      tone && tone.id !== 'natural' ? `Your speaking voice: ${tone.style}.` : '',
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
       mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
