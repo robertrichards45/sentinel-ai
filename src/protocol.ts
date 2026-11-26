@@ -107,3 +107,15 @@ export function parseAdvert(mfg: Uint8Array): { company: number; mac?: string; f
 
 /** Glasses SSID is derived from the last 2 bytes of the BT address (verified: C4:01:03:00:4E:31 -> G2-4E31). */
 export const ssidFromMac = (m: string) => 'G2-' + m.replace(/:/g, '').slice(-4).toUpperCase();
+
+/**
+ * VERIFIED from the official app's traffic (iPhone Bluetooth log, see DIAGNOSTIC_LOG section 22), all on 57FF/33F5:
+ *  audioOn:  the glasses then connect to the iPhone as normal Bluetooth headphones (A2DP + hands-free),
+ *            about 1 s later. That is how the official app's spoken answers reach the glasses' speakers.
+ *  audioOff: the matching "off" value of the same command (seen when the official app finished).
+ */
+export const GLASSES_COMMANDS = {
+  audioOn: '0700010001000100010000000000000000000000',
+  audioOff: '0700010001000100000000000000000000000000',
+} as const;
+export type GlassesCommand = keyof typeof GLASSES_COMMANDS;

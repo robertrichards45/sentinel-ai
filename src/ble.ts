@@ -1,6 +1,7 @@
 import { BleManager, Device, Subscription, State } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
-import { UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
+import { getSettings } from './settings';
+import { GLASSES_COMMANDS, GlassesCommand, UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
 
 export type LinkState = 'bluetooth-off' | 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
 export type PacketLogEntry = { t: number; ch: string; hex: string };
@@ -105,6 +106,8 @@ class GlassesLink {
     watch(UUID.SVC_B, UUID.B_NOTIFY, 'B', parseChannelB);
     watch(UUID.SVC_C, UUID.C_NOTIFY, 'C', (b) => ({ kind: 'raw', channel: 'C', hex: hex(b), confidence: 'unknown' }));
     this.setState('connected');
+    // Headset mode: ask the glasses to join the iPhone as Bluetooth headphones, so Alice (and music) play through them.
+    if (getSettings().glassesAudio) this.glassesCommand('audioOn').catch(() => {});
   }
 
   /** The ONLY write path in the app. Blocks the firmware-update service unconditionally. */
@@ -119,11 +122,15 @@ class GlassesLink {
   }
 
   /**
-   * Glasses speaker test ONLY (approved, one-shot): writes to the audio characteristic 57FF/33F5 and nothing else.
-   * Independent of WRITES_ENABLED, which stays off for every other command. FEF5 can never be reached from here.
+   * The only commands Alice sends to the glasses: exact byte strings copied from the official app's
+   * Bluetooth traffic (iPhone Bluetooth log, 2026-11-26), written to 57FF/33F5 only. Anything else is refused.
+   * FEF5 (firmware update) cannot be reached from here.
    */
-  async speakerTestWrite(bytes: Uint8Array) {
+  async glassesCommand(name: GlassesCommand) {
+    const hexStr = GLASSES_COMMANDS[name];
+    if (!hexStr) throw new Error('BLOCKED: unknown command');
     if (!this.device) throw new Error('Not connected');
+    const bytes = new Uint8Array(Buffer.from(hexStr, 'hex'));
     this.record('W:57ff', bytes);
     await this.device.writeCharacteristicWithResponseForService(UUID.SVC_B, UUID.B_WRITE, Buffer.from(bytes).toString('base64'));
   }

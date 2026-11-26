@@ -8,7 +8,6 @@ import { serverStatus, DEFAULT_SERVER } from '../ai';
 import { addModePack } from '../modeStore';
 import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
-import { lastSpeakerTest } from '../speakerTest';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
@@ -114,6 +113,7 @@ export default function Settings() {
       </Card>
 
       <Card title="Voice">
+        <Toggle label="Hear Alice in the glasses" hint="Connects the glasses to your iPhone as Bluetooth headphones (the same way the Wheat app does), so Alice's voice, and music, play through them." value={s.glassesAudio} onChange={(v) => { updateSettings({ glassesAudio: v }); glasses.glassesCommand(v ? 'audioOn' : 'audioOff').catch(() => {}); }} />
         <Toggle label="Use glasses microphone" hint="When the glasses are connected as headphones" value={s.preferGlassesMic} onChange={(v) => updateSettings({ preferGlassesMic: v })} />
         <Field label="Translate into" value={s.translateTo} onChange={(v) => updateSettings({ translateTo: v })} />
         <Field label="Voice language (e.g. en-US)" value={s.voiceLanguage} onChange={(v) => updateSettings({ voiceLanguage: v })} />
@@ -143,8 +143,6 @@ export default function Settings() {
       <Card title="Diagnostics">
         <Text style={S.dim}>Commands to glasses: {WRITES_ENABLED ? 'on' : 'off (read-only)'}. Firmware-update service: always blocked. Packets logged: {glasses.log.length}.</Text>
         <Btn kind="ghost" title="Share Bluetooth log" disabled={!glasses.log.length} onPress={exportLog} />
-        <Toggle label="Glasses speaker test (one time)" hint="Turn on, then tap the glasses button and say a word. Instead of answering, Alice sends a short voice clip to the glasses' speaker channel. Listen in the glasses, then share the Bluetooth log." value={s.speakerTestArmed} onChange={(v) => updateSettings({ speakerTestArmed: v })} />
-        {lastSpeakerTest() ? <Text style={S.dim}>Last test: {lastSpeakerTest()!.error ? `stopped after ${lastSpeakerTest()!.sent} packets (${lastSpeakerTest()!.error})` : `sent all ${lastSpeakerTest()!.sent} packets`}.</Text> : null}
       </Card>
 
       <Card title="Feature status" right={<Btn kind="ghost" title={showMatrix ? 'Hide' : 'Show'} onPress={() => setShowMatrix(!showMatrix)} />}>
@@ -156,7 +154,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.7.1. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.8.0. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }
