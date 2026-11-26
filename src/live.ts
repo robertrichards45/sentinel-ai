@@ -1,5 +1,6 @@
 import { note } from './diary';
 import { whenSleeping } from './quiet';
+import { setLiveRestarter } from './liveRestart';
 import { setPhoneMic } from './micState';
 /**
  * Real-time conversation with Alice (Gemini Live), ChatGPT-voice style:
@@ -38,6 +39,13 @@ const TOOLS = [
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
   { name: 'save_spot', description: 'Remember the user\'s current location, e.g. where they parked. label defaults to car.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
   { name: 'find_spot', description: 'Where did I park / take me back to a saved spot. Opens walking directions.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
+  { name: 'call', description: 'Phone call to a contact ("call Mom").', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' } }, required: ['who'] } },
+  { name: 'text', description: 'Text message to a contact; opens Messages filled in.', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['who', 'body'] } },
+  { name: 'timer', description: 'Countdown timer in seconds, optional label.', parameters: { type: 'OBJECT', properties: { seconds: { type: 'NUMBER' }, label: { type: 'STRING' } }, required: ['seconds'] } },
+  { name: 'alarm', description: 'Alarm at a local date-time (ISO 8601 with offset), optional label.', parameters: { type: 'OBJECT', properties: { at: { type: 'STRING' }, label: { type: 'STRING' } }, required: ['at'] } },
+  { name: 'cancel_timers', description: 'Cancel the timers and alarms Alice set.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'play_music', description: 'Play an artist, song, album or playlist. app: apple (default) or spotify.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, app: { type: 'STRING' } }, required: ['query'] } },
+  { name: 'translator', description: 'Turn the two-way interpreter on (with a language) or off.', parameters: { type: 'OBJECT', properties: { language: { type: 'STRING' }, on: { type: 'BOOLEAN' } }, required: ['on'] } },
   { name: 'briefing', description: 'Daily briefing: today\'s schedule, the weather here and the top headlines. Use for "brief me", "good morning", "what does my day look like".', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'look_up', description: 'Search the web for current, live information: news, sports scores, stock and crypto prices, events, opening hours, people in the news, anything recent or that changes. Use it whenever you are not sure your knowledge is current.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
   { name: 'stop_listening', description: 'End the conversation and stop listening when the user says stop listening, go to sleep, that\'s all, be quiet, or similar.', parameters: { type: 'OBJECT', properties: {} } },
@@ -133,7 +141,7 @@ class LiveSession {
       tone && tone.id !== 'natural' ? `Your speaking voice: ${tone.style}.` : '',
       mode.id === 'translator' ? '' : 'Always speak English unless the user clearly speaks to you in another language or asks you to translate.',
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
-      mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
+      mode.id === 'translator' ? `You are a live two-way interpreter between English and ${s.translateTo}. When you hear English, say it in ${s.translateTo}. When you hear ${s.translateTo} (or any language other than English), say it in English. Speak ONLY the translation, in the first person, with the speaker's tone; no commentary. If the user says "stop translating", call the translator tool with on:false.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
@@ -322,3 +330,6 @@ export async function previewLiveVoice(line = "Hi, I'm Alice. This is how I soun
   if (fresh) await live.stop();
   return true;
 }
+
+// A mode change (e.g. translator on/off) restarts a running conversation so the new instructions apply.
+setLiveRestarter(async () => { if (live.state === 'off' || live.state === 'error') return; const mic = live.useMic; await live.stop(); await live.start({ mic }); });

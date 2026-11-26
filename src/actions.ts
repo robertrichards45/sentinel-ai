@@ -1,3 +1,5 @@
+import { callContact, textContact, setTimer, setAlarm, cancelTimers, playMusic } from './comms';
+import { restartLiveSoon } from './liveRestart';
 import { respond } from './ai';
 import { readJson, writeJson } from './storage';
 import { agendaText } from './agenda';
@@ -113,6 +115,22 @@ export async function runAction(a: Action): Promise<string> {
       await Linking.openURL(`maps://?daddr=${s.lat},${s.lon}&dirflg=w`);
       const ago = Math.round((Date.now() - s.at) / 60000);
       return `Your ${a.label || 'car'} is ${s.near ? 'near ' + s.near : 'where you saved it'}, saved ${ago < 60 ? ago + ' minutes' : Math.round(ago / 60) + ' hours'} ago. Walking directions are in Apple Maps.`;
+    }
+    case 'call': return callContact(a.who);
+    case 'text': return textContact(a.who, a.body);
+    case 'timer': return setTimer(a.seconds, a.label);
+    case 'alarm': return setAlarm(a.at, a.label);
+    case 'cancel_timers': return cancelTimers();
+    case 'play_music': return playMusic(a.query, a.app);
+    case 'translator': {
+      if (a.on) {
+        await updateSettings({ activeMode: 'translator', ...(a.language ? { translateTo: a.language } : {}) });
+        restartLiveSoon();
+        return `Interpreter on: English and ${a.language || getSettings().translateTo}. Say "stop translating" when you're done.`;
+      }
+      await updateSettings({ activeMode: 'general' });
+      restartLiveSoon();
+      return 'Translator off.';
     }
     case 'briefing': {
       // Your day in one go: schedule, weather where you are, and the top headlines.

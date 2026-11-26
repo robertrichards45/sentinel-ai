@@ -2,7 +2,7 @@
   "expo": {
     "name": "Alice",
     "slug": "alice",
-    "version": "0.9.10",
+    "version": "0.9.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "27",
+      "buildNumber": "28",
       "infoPlist": {
         "CFBundleDisplayName": "Alice",
         "NSBluetoothAlwaysUsageDescription": "Alice connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
@@ -34,7 +34,14 @@
         ],
         "ITSAppUsesNonExemptEncryption": false,
         "UIFileSharingEnabled": true,
-        "LSSupportsOpeningDocumentsInPlace": true
+        "LSSupportsOpeningDocumentsInPlace": true,
+        "LSApplicationQueriesSchemes": [
+          "music",
+          "sms",
+          "spotify",
+          "tel"
+        ],
+        "NSContactsUsageDescription": "Alice looks up the person you ask her to call or text."
       }
     },
     "plugins": [
@@ -107,6 +114,16 @@
           "iosBackgroundMode": true,
           "iosMicrophonePermission": "Alice listens through your glasses or iPhone microphone while you talk to her."
         }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Alice looks up the person you ask her to call or text."
+        }
+      ],
+      [
+        "expo-notifications",
+        {}
       ]
     ],
     "scheme": "alice"

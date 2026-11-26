@@ -171,5 +171,17 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   ok(parseLearned('[1, "x", "Lives in Ohio"]').join() === 'Lives in Ohio', 'filters junk');
 }
 
+// --- New voice commands are validated before they run ---
+{
+  const v = (x: any) => validateAction(x, ['general', 'translator']);
+  check('timer ok', JSON.stringify(v({ type: 'timer', seconds: 600, label: 'pasta' })) === '{"type":"timer","seconds":600,"label":"pasta"}');
+  check('timer rejects 0 s', v({ type: 'timer', seconds: 0 }) === null);
+  check('alarm needs a real time', v({ type: 'alarm', at: 'tomorrow-ish' }) === null && v({ type: 'alarm', at: '2026-11-27T06:00:00-05:00' }) !== null);
+  check('text needs who + body', v({ type: 'text', who: 'Sarah' }) === null && v({ type: 'text', who: 'Sarah', body: 'late' }) !== null);
+  check('call needs who', v({ type: 'call' }) === null && v({ type: 'call', who: 'Mom' }) !== null);
+  check('translator on/off', (v({ type: 'translator', language: 'Spanish', on: true }) as any).on === true && (v({ type: 'translator', on: false }) as any).on === false);
+  check('look_up needs query', v({ type: 'look_up' }) === null && v({ type: 'look_up', query: 'Lakers score' }) !== null);
+}
+
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

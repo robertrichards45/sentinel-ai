@@ -17,6 +17,13 @@ export type Action =
   | { type: 'stop_listening' }
   | { type: 'look_up'; query: string }
   | { type: 'briefing' }
+  | { type: 'call'; who: string }
+  | { type: 'text'; who: string; body: string }
+  | { type: 'timer'; seconds: number; label?: string }
+  | { type: 'alarm'; at: string; label?: string }
+  | { type: 'cancel_timers' }
+  | { type: 'play_music'; query: string; app?: string }
+  | { type: 'translator'; language?: string; on: boolean }
   | { type: 'save_spot'; label?: string }
   | { type: 'find_spot'; label?: string }
   | { type: 'glasses_status' }
@@ -70,6 +77,13 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'agenda': { const d = Number(a.days); return Number.isFinite(d) && d >= 1 && d <= 31 ? { type: 'agenda', days: Math.round(d) } : { type: 'agenda' }; }
     case 'stop_listening': return { type: 'stop_listening' };
     case 'briefing': return { type: 'briefing' };
+    case 'call': { const who = str(a.who, 80); return who ? { type: 'call', who } : null; }
+    case 'text': { const who = str(a.who, 80), body = str(a.body, 1000); return who && body ? { type: 'text', who, body } : null; }
+    case 'timer': { const n = Number(a.seconds); const label = str(a.label, 40); return Number.isFinite(n) && n >= 1 && n <= 86400 ? { type: 'timer', seconds: Math.round(n), ...(label ? { label } : {}) } : null; }
+    case 'alarm': { const at = str(a.at, 40); const label = str(a.label, 60); return at && !isNaN(Date.parse(at)) ? { type: 'alarm', at, ...(label ? { label } : {}) } : null; }
+    case 'cancel_timers': return { type: 'cancel_timers' };
+    case 'play_music': { const query = str(a.query, 120); const app = str(a.app, 20); return query ? { type: 'play_music', query, ...(app ? { app } : {}) } : null; }
+    case 'translator': { const language = str(a.language, 40); return { type: 'translator', on: a.on !== false, ...(language ? { language } : {}) }; }
     case 'look_up': { const query = str(a.query, 300); return query ? { type: 'look_up', query } : null; }
     case 'save_spot': { const label = str(a.label, 60); return label ? { type: 'save_spot', label } : { type: 'save_spot' }; }
     case 'find_spot': { const label = str(a.label, 60); return label ? { type: 'find_spot', label } : { type: 'find_spot' }; }
@@ -115,6 +129,13 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"weather","place":"optional city; omit for the user's location","days":1}   live forecast; use for any weather question
 {"type":"save_spot","label":"car"}   "remember where I parked", "save this spot"
 {"type":"find_spot","label":"car"}   "where did I park?", "take me back to my car"
+{"type":"call","who":"Mom"}   "call Mom"
+{"type":"text","who":"Sarah","body":"Running 10 minutes late"}   "text Sarah I'm running late"
+{"type":"timer","seconds":600,"label":"pasta"}   "set a timer for 10 minutes"
+{"type":"alarm","at":"2026-11-27T06:00:00-05:00","label":"wake up"}   "wake me up at 6", "set an alarm for 7:30"
+{"type":"cancel_timers"}   "cancel my timer/alarm"
+{"type":"play_music","query":"Drake","app":"spotify"}   "play Drake" (app: apple or spotify, default apple)
+{"type":"translator","language":"Spanish","on":true}   "translate for me in Spanish", "be my interpreter"; on:false to stop
 {"type":"briefing"}   "brief me", "good morning", "what's my day look like": schedule + weather + headlines
 {"type":"stop_listening"}   when the user says stop listening, go to sleep, that's all, leave me alone, be quiet, or ends the conversation
 {"type":"report_problem","text":"what went wrong, in the user's words"}   when the user reports a problem or bug with you, the app or the glasses ("note that...", "log a problem", "that didn't work")
