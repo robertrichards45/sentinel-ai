@@ -16,6 +16,7 @@ import { transcribeAudio } from './ai';
 import { live, liveReady } from './live';
 import { getSettings } from './settings';
 import { onSpeaking } from './voice';
+import { setSessionCheck } from './micState';
 
 type Listener = { state?: (s: 'listening' | 'thinking' | 'idle') => void; exchange?: (e: Exchange) => void; error?: (m: string) => void };
 const listeners = new Set<Listener>();
@@ -38,6 +39,8 @@ let spoke = 0; // ms of speech in this turn
 let quiet = 0; // ms of trailing silence
 let followUpTimer: ReturnType<typeof setTimeout> | null = null;
 export const glassesVoiceActive = () => recording;
+/** A glasses-button conversation is in progress (the glasses keep their busy flag up the whole time). */
+export const glassesSessionActive = () => session || recording || processing;
 
 const drive = () => getSettings().glassesConversation;
 const cmd = (c: Parameters<typeof glasses.glassesCommand>[0]) => glasses.glassesCommand(c).catch(() => {});
@@ -135,3 +138,5 @@ glasses.on((e: any) => {
     finish();
   }
 });
+
+setSessionCheck(glassesSessionActive);

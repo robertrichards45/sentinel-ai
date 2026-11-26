@@ -8,3 +8,11 @@ let lastOff = 0;
 export const setPhoneMic = (on: boolean) => { if (phoneMic && !on) lastOff = Date.now(); phoneMic = on; };
 /** True while Alice listens, and for 3 s after (the glasses lower their flag a little late). */
 export const appMicBusy = () => phoneMic || Date.now() - lastOff < 3000;
+
+/** Set by glassesVoice: lets the camera warning know a glasses conversation is running. */
+let sessionCheck: () => boolean = () => false;
+export const setSessionCheck = (fn: () => boolean) => { sessionCheck = fn; };
+/** Busy flag means "microphone", not "camera", while either of these is true. */
+export const micExplainsBusy = () => appMicBusy() || sessionCheck() || Date.now() - lastSession < 5000;
+let lastSession = 0;
+setInterval(() => { if (sessionCheck()) lastSession = Date.now(); }, 500);
