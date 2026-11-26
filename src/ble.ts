@@ -156,15 +156,21 @@ class GlassesLink {
   }
 
   /** Keep headset mode in step with the setting: on connect, once settings have loaded, and when toggled. */
-  syncAudio() {
+  private syncing = false;
+  private lastSync = 0;
+  syncAudio(force = false) {
     if (this.state !== 'connected') return;
     const want = getSettings().glassesAudio;
     if (!want) return;
+    // One hello at a time, and not twice in a row (connect + settings load both ask for it).
+    if (this.syncing || (!force && Date.now() - this.lastSync < 8000)) return;
+    this.syncing = true; this.lastSync = Date.now();
     // Exactly the official app's order: hello on channel A (about 0.4 s apart), then the headphones request.
     (async () => {
       for (const b of helloSequence()) { await this.writeA(b); await new Promise((r) => setTimeout(r, 400)); }
       await this.glassesCommand('audioOn');
-    })().catch((e) => { this.log.push({ t: Date.now(), ch: 'ERR', hex: `hello: ${String(e?.message ?? e)}` }); });
+    })().catch((e) => { this.log.push({ t: Date.now(), ch: 'ERR', hex: `hello: ${String(e?.message ?? e)}` }); })
+      .finally(() => { this.syncing = false; });
   }
 
   async disconnect() {

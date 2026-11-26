@@ -65,16 +65,21 @@ class LiveSession {
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
   spokeAt = 0;
-  private set(s: LiveState, detail?: string) { if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+  private set(s: LiveState, detail?: string) { if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
-  async start() {
+  /** mic:false = no phone microphone; the words come from the glasses' own mic via sendText (glasses button). */
+  useMic = true;
+  async start(opts: { mic?: boolean } = {}) {
     if (this.state !== 'off' && this.state !== 'error') return;
+    this.useMic = opts.mic !== false;
     this.stopping = false; this.handle = undefined;
     this.set('connecting');
     this.t0 = Date.now();
     try {
-      const perm = await AudioManager.requestRecordingPermissions();
-      if (perm !== 'Granted') throw new Error('Microphone permission is needed.');
+      if (this.useMic) {
+        const perm = await AudioManager.requestRecordingPermissions();
+        if (perm !== 'Granted') throw new Error('Microphone permission is needed.');
+      }
       // Voice-chat session: Bluetooth glasses/headset mic + speaker, echo cancellation, loudspeaker otherwise.
       // Keep Bluetooth headphones (the glasses) in high-quality music mode (A2DP): never ask iOS for the
       // headset's call mic (HFP), which would drop Alice to phone-call quality. The mic is the phone's,
@@ -171,7 +176,7 @@ class LiveSession {
     let m: any; try { m = JSON.parse(raw); } catch { return; }
     if (m.setupComplete) {
       markReady();
-      try { await this.startMic(); this.connectMs = Date.now() - this.t0; this.set('listening', `Connected in ${(this.connectMs / 1000).toFixed(1)} s`); }
+      try { if (this.useMic) await this.startMic(); this.connectMs = Date.now() - this.t0; this.set('listening', `Connected in ${(this.connectMs / 1000).toFixed(1)} s`); }
       catch (e: any) { this.set('error', String(e?.message ?? e)); this.stop(); }
       return;
     }
@@ -253,3 +258,14 @@ class LiveSession {
 }
 
 export const live = new LiveSession();
+
+/** Wait until the live conversation is connected (or failed). */
+export async function liveReady(ms = 10000): Promise<boolean> {
+  const t = Date.now();
+  while (Date.now() - t < ms) {
+    if (live.state === 'listening' || live.state === 'speaking' || live.state === 'thinking') return true;
+    if (live.state === 'error' || live.state === 'off') return false;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+}

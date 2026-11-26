@@ -13,7 +13,7 @@ import { glasses } from './ble';
 import { opusToOgg } from './oggOpus';
 import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
-import { live } from './live';
+import { live, liveReady } from './live';
 import { getSettings } from './settings';
 import { onSpeaking } from './voice';
 
@@ -29,9 +29,11 @@ const MAX_TURN_MS = 30000;
 
 let recording = false;
 let frames: Uint8Array[] = [];
-let busy = false;
 let session = false; // Alice is driving the glasses' mic (conversation mode)
 let heard = false; // this session produced at least one turn
+let processing = false; // a turn is being answered; ignore new audio until it's done
+let liveByGlasses = false; // the live conversation was opened for the glasses button (no phone mic)
+let liveIdle: ReturnType<typeof setTimeout> | null = null;
 let spoke = 0; // ms of speech in this turn
 let quiet = 0; // ms of trailing silence
 let followUpTimer: ReturnType<typeof setTimeout> | null = null;
@@ -50,6 +52,8 @@ function startTurn() {
 
 function endSession() {
   if (followUpTimer) { clearTimeout(followUpTimer); followUpTimer = null; }
+  // Close the glasses' live conversation after 90 s without use (saves AI cost; reopening takes ~1.5 s).
+  if (liveByGlasses) { if (liveIdle) clearTimeout(liveIdle); liveIdle = setTimeout(() => { if (liveByGlasses && !session) { liveByGlasses = false; live.stop(); } }, 90000); }
   if (!session) return;
   session = false;
   cmd('micOff').then(() => cmd('endSession'));
@@ -68,22 +72,26 @@ async function followUp() {
 }
 
 async function finish() {
-  if (!recording) return;
+  if (!recording || processing) return;
   recording = false;
-  busy = true; // claim the turn before any await, so the glasses' own "mic off" signal doesn't end the session
+  processing = true; // claim the turn before any await, so the glasses' own "mic off" signal doesn't end the session
   if (followUpTimer) { clearTimeout(followUpTimer); followUpTimer = null; }
-  if (session) await cmd('micOff');
-  busy = false;
-  const f = frames; frames = [];
-  const said = f.filter((x) => !isSilent(x)).length;
-  if (said < 5 || getSettings().privacyMode) { emit('state', 'idle'); endSession(); return; } // nothing said
-  if (busy) return; // one turn at a time
-  busy = true; heard = true; emit('state', 'thinking');
-  const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
   try {
-    if (live.state !== 'off' && live.state !== 'error') {
-      const text = await transcribeAudio(audio);
-      if (text) live.sendText(text);
+    if (session) await cmd('micOff');
+    const f = frames; frames = [];
+    const said = f.filter((x) => !isSilent(x)).length;
+    if (said < 5 || getSettings().privacyMode) { emit('state', 'idle'); endSession(); return; } // nothing said
+    heard = true; emit('state', 'thinking');
+    const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
+    // Fast path: answer through the live conversation (streams Alice's voice as it is generated, ~2-3 s)
+    // instead of the one-question path (whole answer, then a separate voice step, 5-10 s).
+    const useLive = getSettings().liveConversation;
+    if (useLive && (live.state === 'off' || live.state === 'error')) { liveByGlasses = true; live.start({ mic: false }); }
+    if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }
+    if (useLive || (live.state !== 'off' && live.state !== 'error')) {
+      const [text, ready] = await Promise.all([transcribeAudio(audio), liveReady()]); // in parallel
+      if (text && ready) { live.sendText(text); await waitLiveReply(); }
+      else if (text) { const ex = await ask({ text }); emit('exchange', ex); }
     } else {
       const ex = await ask({ audioData: audio });
       emit('exchange', ex);
@@ -92,22 +100,30 @@ async function finish() {
     emit('error', String(e?.message ?? e));
     endSession();
   } finally {
-    busy = false; emit('state', 'idle');
+    processing = false; emit('state', 'idle');
   }
-  if (session) setTimeout(followUp, 600);
+  if (session) setTimeout(followUp, 300);
+}
+
+/** Wait for the live reply to start and finish (or give up after 30 s). */
+async function waitLiveReply() {
+  const t = Date.now();
+  while (Date.now() - t < 8000 && live.state !== 'speaking') await new Promise((r) => setTimeout(r, 100));
+  while (Date.now() - t < 30000 && (live.state === 'speaking' || live.state === 'thinking')) await new Promise((r) => setTimeout(r, 150));
 }
 
 glasses.on((e: any) => {
-  if (e.kind === 'busy' && e.on && drive() && !session && !recording && !busy) {
+  if (e.kind === 'busy' && e.on && drive() && !session && !recording && !processing) {
     // Button pressed: answer it the way the official app does, then switch the glasses mic on.
     session = true; heard = false;
     cmd('ackButton').then(() => setTimeout(() => { if (session) cmd('micOn'); }, 300));
-  } else if (e.kind === 'busy' && !e.on && session && !recording && !busy && !heard) {
+  } else if (e.kind === 'busy' && !e.on && session && !recording && !processing && !heard) {
     endSession(); // glasses closed the session before anything was said (or it was only a photo)
   } else if (e.kind === 'voice') {
-    if (e.on) { if (!recording) startTurn(); }
+    if (e.on) { if (!recording && !processing) startTurn(); }
     else finish();
   } else if (e.kind === 'voiceAudio') {
+    if (processing) return; // still answering the last turn
     if (!recording) startTurn(); // start record missed
     frames.push(...e.frames);
     for (const f of e.frames) {
