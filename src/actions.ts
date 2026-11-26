@@ -1,3 +1,4 @@
+import { resolvePlace, driveMinutes } from './places';
 import { setLook } from './triggers';
 import { callContact, textContact, setTimer, setAlarm, cancelTimers, playMusic } from './comms';
 import { restartLiveSoon } from './liveRestart';
@@ -56,6 +57,23 @@ export async function runAction(a: Action): Promise<string> {
       if (!getSettings().memoryEnabled) return 'Memory is turned off in Settings, so I did not save that.';
       await memory.remember(a.fact);
       return 'Saved to memory.';
+    case 'place_reminder': {
+      const where = await resolvePlace(a.place);
+      if (!where) return `I couldn't find "${a.place}". Say "remember this place as ${a.place}" when you're there, then try again.`;
+      if (!(await confirm('Create reminder?', `${a.title}\nWhen you ${a.when === 'leave' ? 'leave' : 'get to'} ${a.place}`))) return 'Reminder cancelled.';
+      const p = await Calendar.requestRemindersPermissions();
+      if (p.status !== 'granted') return 'I need Reminders permission to do that.';
+      const lists = await Calendar.getCalendars('reminder' as any);
+      const list = lists.find((c: any) => c.allowsModifications) ?? lists[0];
+      if (!list) return 'No reminders list found on this iPhone.';
+      await list.createReminder({ title: a.title, alarms: [{ structuredLocation: { title: a.place, proximity: a.when === 'leave' ? 'leave' : 'enter', radius: 150, coords: { latitude: where.lat, longitude: where.lon } } }] } as any);
+      return `Done. I'll remind you to ${a.title.charAt(0).toLowerCase() + a.title.slice(1)} when you ${a.when === 'leave' ? 'leave' : 'get to'} ${a.place}. iPhone handles it, even when I'm closed.`;
+    }
+    case 'what_you_know': {
+      const m = memory.get();
+      if (!m.facts.length) return "I don't know much about you yet. Tell me things, like what you drive or who's in your family, and I'll keep them.";
+      return `Here's what I know: ${m.facts.slice(-15).map((f) => f.text.replace(/\.$/, '')).join('; ')}.${m.facts.length > 15 ? ` And ${m.facts.length - 15} more on the Memory tab.` : ''}`;
+    }
     case 'forget': {
       const n = await memory.forget(a.match);
       return n ? `Removed ${n} item${n > 1 ? 's' : ''} from memory.` : 'Nothing in memory matched that.';
@@ -80,9 +98,20 @@ export async function runAction(a: Action): Promise<string> {
       const p = await Calendar.requestCalendarPermissions();
       if (p.status !== 'granted') return 'I need Calendar permission to do that.';
       const cal = Calendar.getDefaultCalendarSync();
-      await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms: [{ relativeOffset: -1440 }, { relativeOffset: -60 }, { relativeOffset: -15 }] } as any);
+      // With a place: estimate the drive and add a "time to leave" alert (10 minutes of slack, no live traffic).
+      let leaveNote = '';
+      const alarms: any[] = [{ relativeOffset: -1440 }, { relativeOffset: -60 }, { relativeOffset: -15 }];
+      if (a.place) {
+        const where = await resolvePlace(a.place).catch(() => null);
+        const mins = where ? await driveMinutes(where) : null;
+        if (mins !== null && mins > 3) {
+          alarms.push({ relativeOffset: -(mins + 10) });
+          leaveNote = ` It's about a ${mins}-minute drive from here, so I'll tell you to leave ${mins + 10} minutes before.`;
+        }
+      }
+      await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms, ...(a.place ? { location: a.place } : {}) } as any);
       if (getSettings().memoryEnabled) memory.note(`Has "${a.title}" on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`).catch(() => {});
-      return `Added ${a.title} on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. I'll remind you the day before, an hour before and 15 minutes before.`;
+      return `Added ${a.title} on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. I'll remind you the day before, an hour before and 15 minutes before.${leaveNote}`;
     }
     case 'email': {
       if (!(await MailComposer.isAvailableAsync())) return 'Mail is not set up on this iPhone.';

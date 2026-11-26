@@ -17,9 +17,23 @@ export function addFact(m: MemoryState, text: string, now = Date.now()): MemoryS
 }
 
 /** Removes every fact/note containing the phrase. Returns how many were removed. */
+const words = (s: string) => new Set(norm(s).replace(/[^a-z0-9 ]/g, ' ').split(' ').filter((w) => w.length > 2));
+/** Share of the match's words found in the text (0..1). */
+export function overlap(text: string, match: string): number {
+  const a = words(match), b = words(text);
+  if (!a.size) return 0;
+  let n = 0; for (const w of a) if (b.has(w)) n++;
+  return n / a.size;
+}
+
 export function forget(m: MemoryState, match: string): { state: MemoryState; removed: number } {
   const k = norm(match);
-  const facts = m.facts.filter((f) => !norm(f.text).includes(k));
+  let facts = m.facts.filter((f) => !norm(f.text).includes(k));
+  // Nothing matched word-for-word: drop the single closest fact if it's clearly the one meant.
+  if (facts.length === m.facts.length && m.facts.length) {
+    const best = m.facts.map((f) => ({ f, s: overlap(f.text, match) })).sort((x, y) => y.s - x.s)[0];
+    if (best.s >= 0.6) facts = m.facts.filter((f) => f !== best.f);
+  }
   const notes = m.notes.filter((n) => !norm(n.text).includes(k));
   return { state: { ...m, facts, notes }, removed: m.facts.length - facts.length + m.notes.length - notes.length };
 }
@@ -35,10 +49,18 @@ export function addTurn(m: MemoryState, role: Turn['role'], text: string, now = 
 /** Context block sent with each request. Only facts the user explicitly asked to keep. */
 export function memoryPrompt(m: MemoryState, now = new Date()): string {
   const lines = [`Current local time: ${now.toString()}`];
-  if (m.facts.length) lines.push('Things the user asked you to remember:\n' + m.facts.map((f) => '- ' + f.text).join('\n'));
+  if (m.facts.length) lines.push('What you know about the user (use it naturally when it helps, e.g. their car for car questions; never recite the list unprompted):\n' + m.facts.map((f) => '- ' + f.text).join('\n'));
   const recentNotes = m.notes.slice(-10);
   if (recentNotes.length) lines.push('Recent notes:\n' + recentNotes.map((n) => '- ' + n.text).join('\n'));
   return lines.join('\n\n');
+}
+
+/** Learner reply: {"add":[...], "outdated":[...]} (or a bare array of new facts). */
+export function parseLearnedUpdate(reply: string): { add: string[]; outdated: string[] } {
+  const clean = (arr: unknown) => Array.isArray(arr) ? arr.filter((x) => typeof x === 'string').map((x: string) => x.trim()).filter((x) => x.length >= 4 && x.length <= 200).slice(0, 10) : [];
+  const o = reply.match(/\{[\s\S]*\}/);
+  if (o) { try { const j = JSON.parse(o[0]); if (j && (j.add || j.outdated)) return { add: clean(j.add), outdated: clean(j.outdated) }; } catch {} }
+  return { add: parseLearned(reply), outdated: [] };
 }
 
 /** Parse the fact-extractor's reply: a JSON array of short sentences (tolerates code fences / extra text). */

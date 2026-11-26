@@ -15,6 +15,7 @@ import { opusToOgg } from './oggOpus';
 import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
 import { live, liveReady } from './live';
+import { streamStart, streamFrames, streamEnd, streaming } from './glassesStream';
 import { getSettings } from './settings';
 import { onSpeaking, stopSpeaking } from './voice';
 import { setSessionCheck } from './micState';
@@ -50,8 +51,18 @@ const isSilent = (f: Uint8Array) => f.length <= 3; // the glasses send 1-byte fr
 let speaking = false;
 onSpeaking((on) => { speaking = on; });
 
+const liveUp = () => live.state === 'listening' || live.state === 'speaking' || live.state === 'thinking';
+/** Open the live conversation in advance (on the button press), so it's ready by the time you finish talking. */
+function warmLive() {
+  if (!getSettings().liveConversation || isAsleep() || getSettings().privacyMode) return;
+  if (live.state === 'off' || live.state === 'error') { liveByGlasses = true; live.start({ mic: false }); }
+  if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }
+}
+
 function startTurn() {
   recording = true; frames = []; spoke = 0; quiet = 0;
+  // Stream your voice into the live conversation while you talk (no speech-to-text step afterwards).
+  if (getSettings().liveConversation && liveUp()) streamStart();
   emit('state', 'listening');
 }
 
@@ -85,9 +96,22 @@ async function finish() {
     if (session) await cmd('micOff');
     const f = frames; frames = [];
     const said = f.filter((x) => !isSilent(x)).length;
-    if (said < 5 || getSettings().privacyMode) { emit('state', 'idle'); endSession(); return; } // nothing said
+    const wasStreaming = streaming();
+    if (said < 5 || getSettings().privacyMode) { if (wasStreaming) await streamEnd(); emit('state', 'idle'); endSession(); return; } // nothing said
     heard = true; emit('state', 'thinking');
     const tEnd = Date.now();
+    if (wasStreaming && liveUp()) {
+      // Fastest path: the AI already heard you live; just tell it you're done.
+      await streamEnd();
+      const t0 = Date.now();
+      while (Date.now() - t0 < 4000 && live.state === 'listening') await new Promise((r) => setTimeout(r, 80));
+      if (live.state === 'speaking' || live.state === 'thinking') {
+        const first = await waitLiveReply();
+        note('reply-timing', { path: 'live-stream', firstVoiceMs: first ? first - tEnd : null });
+        return;
+      }
+      note('stream-no-reply'); // the AI didn't pick it up: fall back to speech-to-text below
+    }
     note('glasses-turn', { speechMs: spoke, frames: f.length });
     const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
     // Fast path: answer through the live conversation (streams Alice's voice as it is generated, ~2-3 s)
@@ -113,8 +137,9 @@ async function finish() {
     endSession();
   } finally {
     processing = false; emit('state', 'idle');
+    // Listen for a follow-up (also after the fast streaming path, which returns early).
+    if (session && !isAsleep()) setTimeout(followUp, 300); else if (isAsleep()) endSession();
   }
-  if (session && !isAsleep()) setTimeout(followUp, 300); else if (isAsleep()) endSession();
 }
 
 /** Wait for the live reply to start and finish (or give up after 30 s). */
@@ -137,6 +162,7 @@ glasses.on((e: any) => {
     // Button pressed: answer it the way the official app does, then switch the glasses mic on.
     wakeUp(); // pressing the button is you asking for Alice
     session = true; heard = false;
+    warmLive();
     cmd('ackButton').then(() => setTimeout(() => { if (session) cmd('micOn'); }, 300));
   } else if (e.kind === 'busy' && !e.on && session && !recording && !processing && !heard) {
     endSession(); // glasses closed the session before anything was said (or it was only a photo)
@@ -148,6 +174,7 @@ glasses.on((e: any) => {
     if (isAsleep() && !session) return; // you told her to stop listening
     if (!recording) startTurn(); // start record missed
     frames.push(...e.frames);
+    streamFrames(e.frames);
     for (const f of e.frames) {
       if (isSilent(f)) quiet += FRAME_MS; else { spoke += FRAME_MS; quiet = 0; if (followUpTimer) { clearTimeout(followUpTimer); followUpTimer = null; } }
     }

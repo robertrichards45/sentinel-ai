@@ -8,7 +8,9 @@ export type Action =
   | { type: 'forget'; match: string }
   | { type: 'note'; text: string }
   | { type: 'reminder'; title: string; due?: string }
-  | { type: 'event'; title: string; start: string; durationMin: number }
+  | { type: 'event'; title: string; start: string; durationMin: number; place?: string }
+  | { type: 'place_reminder'; title: string; place: string; when: 'arrive' | 'leave' }
+  | { type: 'what_you_know' }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
@@ -44,6 +46,8 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
   if (!a || typeof a !== 'object') return null;
   switch (a.type) {
     case 'remember': { const fact = str(a.fact, 300); return fact ? { type: 'remember', fact } : null; }
+    case 'place_reminder': { const title = str(a.title, 200), place = str(a.place, 200); return title && place ? { type: 'place_reminder', title, place, when: a.when === 'leave' ? 'leave' : 'arrive' } : null; }
+    case 'what_you_know': return { type: 'what_you_know' };
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
     case 'reminder': {
@@ -56,7 +60,8 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
       const title = str(a.title, 200), start = iso(a.start);
       const d = Number(a.durationMin);
       if (!title || !start) return null;
-      return { type: 'event', title, start, durationMin: Number.isFinite(d) && d > 0 && d <= 1440 ? Math.round(d) : 60 };
+      const place = str(a.place, 200);
+      return { type: 'event', title, start, durationMin: Number.isFinite(d) && d > 0 && d <= 1440 ? Math.round(d) : 60, ...(place ? { place } : {}) };
     }
     case 'email': {
       const subject = str(a.subject, 200), body = str(a.body, 5000), to = str(a.to, 200);
@@ -121,10 +126,12 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"heard": "<only when the user spoke: exact transcript of their words>", "reply": "<what to say aloud, short, natural>", "actions": [ ... ]}
 "actions" may be empty. Allowed actions (use ISO 8601 with the user's UTC offset for times):
 {"type":"remember","fact":"..."}            only when the user asks you to remember something
-{"type":"forget","match":"..."}
+{"type":"forget","match":"exact text of the fact to forget, copied from what you know"}
+{"type":"place_reminder","title":"Take out the trash","place":"home","when":"arrive"}   "remind me when I get home / leave work / get to Walmart"
+{"type":"what_you_know"}   "what do you know about me?"
 {"type":"note","text":"..."}
 {"type":"reminder","title":"...","due":"2026-11-26T09:00:00-05:00"}
-{"type":"event","title":"...","start":"...","durationMin":60}
+{"type":"event","place":"optional address or place name; adds a time-to-leave alert","title":"...","start":"...","durationMin":60}
 {"type":"email","to":"optional","subject":"...","body":"..."}   (opens a draft; the user sends it)
 {"type":"navigate","destination":"...","mode":"walking|driving|transit"}
 {"type":"where_am_i"}

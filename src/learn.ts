@@ -4,13 +4,13 @@
  * "remember". You can see and delete them on the Memory tab. Off when Memory or Privacy mode is off.
  */
 import { memory } from './memory';
-import { parseLearned } from './memoryCore';
+import { parseLearnedUpdate } from './memoryCore';
 import { respond } from './ai';
 import { getSettings } from './settings';
 import { live } from './live';
 import { note } from './diary';
 
-const SYSTEM = `You maintain an assistant's long-term memory about its user. From the conversation, list NEW lasting facts about the user worth remembering for months: possessions (car make/model/year), people in their life and their names, job, home area, health or diet the user stated, preferences, routines, goals and upcoming plans with dates. Write each as a short standalone sentence in third person ("Drives a 2021 Dodge Charger"). Skip small talk, questions, jokes, one-off requests and anything already in KNOWN FACTS. Reply with ONLY a JSON array of strings, [] if nothing new.`;
+const SYSTEM = `You maintain an assistant's long-term memory about its user. From the conversation, list NEW lasting facts about the user worth remembering for months: possessions (car make/model/year), people in their life and their names, job, home area, health or diet the user stated, preferences, routines, goals and upcoming plans with dates. Write each as a short standalone sentence in third person ("Drives a 2021 Dodge Charger"). Skip small talk, questions, jokes, one-off requests and anything already in KNOWN FACTS. Also list KNOWN FACTS the conversation shows are no longer true (sold that car, moved, changed jobs), copied exactly. Reply with ONLY JSON: {"add":[...new facts],"outdated":[...exact known facts to drop]}. Use empty arrays if nothing changed.`;
 
 let lastLearn = 0;
 let running = false;
@@ -27,10 +27,13 @@ export async function learnNow() {
     const known = m.facts.map((f) => '- ' + f.text).join('\n') || '(none)';
     const convo = turns.map((t) => `${t.role === 'user' ? 'User' : 'Alice'}: ${t.text}`).join('\n');
     const r = await respond('general', SYSTEM, [], `KNOWN FACTS:\n${known}\n\nCONVERSATION:\n${convo}`);
-    const facts = parseLearned(r.text);
+    const { add: facts, outdated } = parseLearnedUpdate(r.text);
+    const knownSet = new Set(m.facts.map((f) => f.text.trim()));
+    let dropped = 0;
+    for (const o of outdated) if (knownSet.has(o)) dropped += await memory.forget(o);
     for (const f of facts) await memory.remember(f);
     lastLearn = until;
-    if (facts.length) note('learned', { count: facts.length });
+    if (facts.length || dropped) note('learned', { count: facts.length, dropped });
   } catch (e: any) {
     note('learn-error', { msg: String(e?.message ?? e) });
   } finally { running = false; }

@@ -34,11 +34,14 @@ const NATURAL = ['Sulafat', 'Aoede', 'Laomedeia', 'Achernar', 'Vindemiatrix', 'D
 const TOOLS = [
   { name: 'remember', description: 'Save a lasting fact about the user: ALWAYS call it when they tell you something about themselves worth knowing later (their car, family, job, home, likes, plans, preferences) or say remember. Write it as a short standalone sentence, e.g. "Drives a 2021 Dodge Charger".', parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING' } }, required: ['fact'] } },
   { name: 'reminder', description: 'Create an iPhone reminder. due is ISO 8601 with the user UTC offset.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, due: { type: 'STRING' } }, required: ['title'] } },
-  { name: 'event', description: 'Add a calendar event.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' } }, required: ['title', 'start'] } },
+  { name: 'event', description: 'Add a calendar event. place (optional): where it is; adds a time-to-leave alert.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' }, place: { type: 'STRING' } }, required: ['title', 'start'] } },
   { name: 'email', description: 'Open an email draft for the user to send.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, subject: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['subject', 'body'] } },
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
   { name: 'save_spot', description: 'Remember the user\'s current location, e.g. where they parked. label defaults to car.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
   { name: 'find_spot', description: 'Where did I park / take me back to a saved spot. Opens walking directions.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
+  { name: 'place_reminder', description: 'Reminder that goes off when the user arrives at or leaves a place ("remind me when I get home"). place: home, work, a saved spot, an address or a store name.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, place: { type: 'STRING' }, when: { type: 'STRING', enum: ['arrive', 'leave'] } }, required: ['title', 'place'] } },
+  { name: 'what_you_know', description: 'List what Alice remembers about the user ("what do you know about me?").', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'forget', description: 'Forget a remembered fact. match: the exact fact text as it appears in what you know.', parameters: { type: 'OBJECT', properties: { match: { type: 'STRING' } }, required: ['match'] } },
   { name: 'call', description: 'Phone call to a contact ("call Mom").', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' } }, required: ['who'] } },
   { name: 'text', description: 'Text message to a contact; opens Messages filled in.', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['who', 'body'] } },
   { name: 'timer', description: 'Countdown timer in seconds, optional label.', parameters: { type: 'OBJECT', properties: { seconds: { type: 'NUMBER' }, label: { type: 'STRING' } }, required: ['seconds'] } },
@@ -274,6 +277,19 @@ class LiveSession {
     if (this.ws?.readyState !== 1 || !text.trim()) return false;
     this.ws.send(JSON.stringify({ realtimeInput: { text: text.trim() } }));
     return true;
+  }
+
+  /** Feed audio from somewhere other than the phone mic (the glasses' own microphone), 16 kHz mono floats. */
+  sendAudio16k(f: Float32Array) {
+    if (this.ws?.readyState !== 1 || !f.length) return false;
+    const pcm = floatToPcm16(f);
+    this.ws.send(JSON.stringify({ realtimeInput: { audio: { data: Buffer.from(pcm.buffer as ArrayBuffer, pcm.byteOffset, pcm.byteLength).toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
+    return true;
+  }
+  /** That audio has paused: answer now instead of waiting for more. */
+  endAudio() {
+    if (this.ws?.readyState !== 1) return;
+    this.ws.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
   }
 
   /** Cut Alice off mid-reply (glasses button pressed while she talks): silence now, drop the rest of this answer. */

@@ -1,5 +1,5 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
-import { parseLearned } from '../src/memoryCore';
+import { parseLearned, parseLearnedUpdate, overlap } from '../src/memoryCore';
 // Unit tests for the pure modules, using the REAL files backed up from the glasses.
 // Run: npx tsx test/core.test.ts
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -191,6 +191,23 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('only G2 uses a data link', GLASSES.filter((g) => g.caps.dataLink).map((g) => g.id).join() === 'g2');
   check('unknown model falls back to G2', glassesInfo(undefined).id === 'g2' && glassesInfo('nope').id === 'g2');
   check('every model has setup tips', GLASSES.every((g) => g.setupTips.length > 0));
+}
+
+// --- 0.10.1: location reminders, leave-time events, smarter memory ---
+{
+  const pr = validateAction({ type: 'place_reminder', title: 'Take out trash', place: 'home', when: 'leave' }, modes) as any;
+  check('place reminder kept', pr?.place === 'home' && pr?.when === 'leave');
+  check('place reminder defaults to arrive', (validateAction({ type: 'place_reminder', title: 'x y', place: 'work' }, modes) as any)?.when === 'arrive');
+  check('place reminder needs a place', validateAction({ type: 'place_reminder', title: 'x' }, modes) === null);
+  check('event keeps place', (validateAction({ type: 'event', title: 'Dentist', start: '2026-12-01T09:00:00-05:00', place: '12 Main St' }, modes) as any)?.place === '12 Main St');
+  check('what_you_know valid', (validateAction({ type: 'what_you_know' }, modes) as any)?.type === 'what_you_know');
+  let m = addFact(addFact(EMPTY, 'Drives a 2021 Dodge Charger'), 'Has a dog named Max');
+  check('fuzzy forget removes the closest fact', forget(m, 'drives a Dodge Charger 2021 model').state.facts.length === 1);
+  check('fuzzy forget leaves unrelated facts', forget(m, 'likes pizza').removed === 0);
+  check('overlap score', overlap('Drives a 2021 Dodge Charger', 'dodge charger') === 1);
+  const u = parseLearnedUpdate('{"add":["Drives a 2024 Ford F-150"],"outdated":["Drives a 2021 Dodge Charger"]}');
+  check('learner update parsed', u.add.length === 1 && u.outdated[0] === 'Drives a 2021 Dodge Charger');
+  check('learner bare array still works', parseLearnedUpdate('["Lives in Ohio"]').add[0] === 'Lives in Ohio');
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
