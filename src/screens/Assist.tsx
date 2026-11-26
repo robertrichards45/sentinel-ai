@@ -42,18 +42,18 @@ export default function Assist() {
   const [attached, setAttached] = useState<Attachment | null>(null);
   const lastPhoto = useRef<string | undefined>(undefined);
   const [liveState, setLiveState] = useState<LiveState>(live.state);
-  const [liveNote, setLiveNote] = useState('');
-  const [lines, setLines] = useState<LiveLine[]>([]);
+  const [liveNote, setLiveNote] = useState(live.detail);
+  const [lines, setLines] = useState<LiveLine[]>(live.lines);
   const liveOn = liveState !== 'off' && liveState !== 'error';
+  useEffect(() => live.subscribe({
+    state: (st, detail) => { setLiveState(st); if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? ''); },
+    line: () => setLines(live.lines),
+  }), []);
   const toggleLive = async () => {
     if (liveOn) { await live.stop(); return; }
     stopSpeaking(); setErr(''); setLiveNote('');
-    await live.start({
-      state: (st, detail) => { setLiveState(st); if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? ''); },
-      line: (l) => setLines((x) => [l, ...x].slice(0, 60)),
-    });
+    await live.start();
   };
-  useEffect(() => () => { live.stop(); }, []);
   const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
   const listeningRef = useRef(false);
   const pressingRef = useRef(false);

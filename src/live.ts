@@ -21,6 +21,7 @@ import { floatToPcm16, resampleLinear } from './liveCore';
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 export type LiveLine = { who: 'you' | 'alice' | 'done'; text: string; t: number };
 type Events = { state: (s: LiveState, detail?: string) => void; line: (l: LiveLine) => void };
+type Sub = Partial<Events>;
 
 const NATURAL = ['Sulafat', 'Aoede', 'Achernar', 'Vindemiatrix', 'Kore', 'Leda', 'Puck', 'Achird', 'Charon', 'Algieba', 'Iapetus', 'Gacrux'];
 
@@ -31,6 +32,7 @@ const TOOLS = [
   { name: 'event', description: 'Add a calendar event.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' } }, required: ['title', 'start'] } },
   { name: 'email', description: 'Open an email draft for the user to send.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, subject: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['subject', 'body'] } },
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
+  { name: 'weather', description: 'Live weather and forecast. Omit place for the user\'s current location.', parameters: { type: 'OBJECT', properties: { place: { type: 'STRING' }, days: { type: 'NUMBER' } } } },
   { name: 'where_am_i', description: "Tell the user where they are (street/city).", parameters: { type: 'OBJECT', properties: {} } },
   { name: 'glasses_status', description: 'Glasses connection, battery and photo count.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'document', description: 'Create a document (letter, report, list, plan, resume...) as a PDF. content is the COMPLETE document in Markdown.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, content: { type: 'STRING' }, format: { type: 'STRING', enum: ['pdf', 'text'] } }, required: ['title', 'content'] } },
@@ -49,14 +51,20 @@ class LiveSession {
   private youBuf = '';
   private aliceBuf = '';
   private stopping = false;
-  private ev: Events | null = null;
+  private subs = new Set<Sub>();
+  private ev = { state: (st: LiveState, d?: string) => this.subs.forEach((x) => x.state?.(st, d)), line: (l: LiveLine) => { this.lines = [l, ...this.lines].slice(0, 60); this.subs.forEach((x) => x.line?.(l)); } };
   state: LiveState = 'off';
+  detail = '';
+  lines: LiveLine[] = [];
 
-  private set(s: LiveState, detail?: string) { this.state = s; this.ev?.state(s, detail); }
+  /** Screens subscribe while visible; the conversation itself keeps running (other tabs, locked phone). */
+  subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
-  async start(ev: Events) {
+  private set(s: LiveState, detail?: string) { this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+
+  async start() {
     if (this.state !== 'off' && this.state !== 'error') return;
-    this.ev = ev; this.stopping = false; this.handle = undefined;
+    this.stopping = false; this.handle = undefined;
     this.set('connecting');
     try {
       const perm = await AudioManager.requestRecordingPermissions();
@@ -173,8 +181,8 @@ class LiveSession {
     }
   }
 
-  private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t) { this.ev?.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
-  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t) { this.ev?.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
+  private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t) { this.ev.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
+  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t) { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
 
   private async handleTools(calls: { id: string; name: string; args?: any }[]) {
     this.set('thinking');
@@ -185,7 +193,7 @@ class LiveSession {
       let result: string;
       try { result = a ? await runAction(a) : `Could not do ${c.name}: missing or invalid details.`; }
       catch (e: any) { result = `Could not do ${c.name}: ${e?.message ?? e}`; }
-      this.ev?.line({ who: 'done', text: result, t: Date.now() });
+      this.ev.line({ who: 'done', text: result, t: Date.now() });
       functionResponses.push({ id: c.id, name: c.name, response: { result } });
     }
     try { this.ws?.send(JSON.stringify({ toolResponse: { functionResponses } })); } catch {}

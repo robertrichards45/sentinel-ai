@@ -12,6 +12,7 @@ export type Action =
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
+  | { type: 'weather'; place?: string; days?: number }
   | { type: 'glasses_status' }
   | { type: 'set_mode'; mode: string }
   | { type: 'document'; title: string; format: 'pdf' | 'text'; content: string };
@@ -54,6 +55,10 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
       return destination ? { type: 'navigate', destination, mode } : null;
     }
     case 'where_am_i': return { type: 'where_am_i' };
+    case 'weather': {
+      const place = str(a.place, 100); const d = Number(a.days);
+      return { type: 'weather', ...(place ? { place } : {}), ...(Number.isFinite(d) && d >= 1 && d <= 7 ? { days: Math.round(d) } : {}) };
+    }
     case 'glasses_status': return { type: 'glasses_status' };
     case 'set_mode': return knownModes.includes(a.mode) ? { type: 'set_mode', mode: a.mode } : null;
     case 'document': {
@@ -93,6 +98,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"email","to":"optional","subject":"...","body":"..."}   (opens a draft; the user sends it)
 {"type":"navigate","destination":"...","mode":"walking|driving|transit"}
 {"type":"where_am_i"}
+{"type":"weather","place":"optional city; omit for the user's location","days":1}   live forecast; use for any weather question
 {"type":"glasses_status"}
 {"type":"set_mode","mode":"<mode id>"}
 {"type":"document","title":"...","format":"pdf|text","content":"<the COMPLETE document in Markdown: # title, ## headings, - lists, | tables |>"}

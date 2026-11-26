@@ -10,6 +10,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Directory, File, Paths } from 'expo-file-system';
 import { documentHtml, fileNameFor } from './docCore';
+import { describeWeather } from './weatherCore';
 
 /** Alice's documents live in the app's Documents folder ("On My iPhone > Alice" in Files). */
 async function saveDocument(title: string, format: 'pdf' | 'text', content: string): Promise<File> {
@@ -85,6 +86,24 @@ export async function runAction(a: Action): Promise<string> {
       const [addr] = await Location.reverseGeocodeAsync(pos.coords);
       if (!addr) return `You are at latitude ${pos.coords.latitude.toFixed(4)}, longitude ${pos.coords.longitude.toFixed(4)}.`;
       return `You're near ${[addr.name, addr.street, addr.city].filter(Boolean).join(', ')}.`;
+    }
+    case 'weather': {
+      let lat: number, lon: number, label: string;
+      if (a.place) {
+        const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(a.place)}`)).json();
+        const r = g?.results?.[0];
+        if (!r) return `I couldn't find a place called ${a.place}.`;
+        lat = r.latitude; lon = r.longitude; label = [r.name, r.admin1].filter(Boolean).join(', ');
+      } else {
+        const p = await Location.requestForegroundPermissionsAsync();
+        if (p.status !== 'granted') return 'I need location permission for local weather, or tell me a city.';
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
+        lat = pos.coords.latitude; lon = pos.coords.longitude; label = 'your area';
+      }
+      const units = /^en-US/i.test(getSettings().voiceLanguage) ? 'fahrenheit' : 'celsius';
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=${a.days ?? 2}&temperature_unit=${units}&wind_speed_unit=${units === 'fahrenheit' ? 'mph' : 'kmh'}`;
+      const w = await (await fetch(url)).json();
+      return describeWeather(w, label, units);
     }
     case 'navigate': {
       const flag = a.mode === 'driving' ? 'd' : a.mode === 'transit' ? 'r' : 'w';

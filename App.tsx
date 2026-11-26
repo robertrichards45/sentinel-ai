@@ -22,6 +22,7 @@ import { glasses } from './src/ble';
 import { useGlasses } from './src/hooks';
 import { onGlassesButton } from './src/glassesState';
 import { requestListen, isTalkLink } from './src/triggers';
+import { live, LiveState } from './src/live';
 import { Backdrop, Orb } from './src/Orb';
 import { C, F, Glass, Ionicons } from './src/ui';
 
@@ -38,13 +39,16 @@ const TABS: { id: Tab; label: string; icon: IconName; iconOn: IconName }[] = [
 /** Floating frosted-glass tab bar. The active tab gets a violet glow. */
 function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const g = useGlasses();
+  const [ls, setLs] = useState<LiveState>(live.state);
+  useEffect(() => live.subscribe({ state: (st) => setLs(st) }), []);
+  const talking = ls !== 'off' && ls !== 'error';
   const inset = useSafeAreaInsets();
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
       <Glass radius={30} intensity={50} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 6, backgroundColor: 'rgba(10,12,30,0.55)' }}>
         {TABS.map((t) => {
           const on = tab === t.id;
-          const badge = t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
+          const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
           return (
             <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => setTab(t.id)}
               style={{ flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 }}>

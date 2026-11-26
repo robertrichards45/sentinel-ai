@@ -8,6 +8,7 @@ import { BUILT_IN_MODES, importModes } from '../src/modes';
 import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
 import { splitForSpeech } from '../src/speechCore';
 import { floatToPcm16, resampleLinear } from '../src/liveCore';
+import { describeWeather } from '../src/weatherCore';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
 let fails = 0;
@@ -112,6 +113,16 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('48 kHz -> 16 kHz keeps length ratio and level', r.length === 160 && Math.abs(r[80] - 0.25) < 1e-6, r.length);
   const same = new Float32Array([1, 2]);
   check('same rate is a no-op', resampleLinear(same, 16000, 16000) === same, 'copied');
+}
+
+// ---- weather ----
+{
+  const w = { current: { temperature_2m: 41.2, apparent_temperature: 35, weather_code: 3, wind_speed_10m: 22, precipitation: 0 },
+    daily: { time: ['a', 'b'], weather_code: [61, 0], temperature_2m_max: [45, 50], temperature_2m_min: [33, 30], precipitation_probability_max: [70, 5] } };
+  const t = describeWeather(w, 'New York, New York', 'fahrenheit');
+  check('weather sentence', t.startsWith("In New York, New York it's 41°F and overcast, feels like 35, windy at 22 mph.") && t.includes('70% chance of rain') && t.includes('Tomorrow: clear, 30 to 50°F.'), t);
+  check('weather action validated', JSON.stringify(validateAction({ type: 'weather', place: 'Paris', days: 9 }, [])) === '{"type":"weather","place":"Paris"}', validateAction({ type: 'weather', place: 'Paris', days: 9 }, []));
+  check('weather missing data handled', describeWeather({}, 'x', 'celsius').startsWith("I couldn't"), 'threw');
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);
