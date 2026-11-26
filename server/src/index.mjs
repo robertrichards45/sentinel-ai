@@ -74,7 +74,7 @@ export const server = createServer(async (req, res) => {
       if (!take('l:' + installId, config.live.perInstallPerDay)) return send(res, 429, { error: 'Conversation limit reached for today.' });
       const t = await (config.mock ? mock : gemini).liveToken();
       const base = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
-      const endpoints = ['v1beta', 'v1alpha'].map((v) => `${base}.${v}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token)}`);
+      const endpoints = [t.version, t.version === 'v1beta' ? 'v1alpha' : 'v1beta'].map((v) => `${base}.${v}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token)}`);
       return send(res, 200, { ...t, endpoints });
     }
 

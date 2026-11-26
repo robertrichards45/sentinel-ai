@@ -95,17 +95,23 @@ export function findAudio(j) {
 // (session resumption may reconnect with the same token inside that window).
 export async function liveToken() {
   const now = Date.now();
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.keys.gemini },
-    body: JSON.stringify({
-      uses: 1,
-      expireTime: new Date(now + 30 * 60000).toISOString(),
-      newSessionExpireTime: new Date(now + 2 * 60000).toISOString(),
-      liveConnectConstraints: { model: `models/${config.live.model}`, config: { responseModalities: ['AUDIO'], sessionResumption: {} } },
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.name) throw Object.assign(new Error(`Gemini ${r.status}: ${j.error?.message ?? 'could not start a live session'}`), { status: r.status || 502 });
-  return { token: j.name, model: config.live.model, expiresAt: new Date(now + 30 * 60000).toISOString() };
+  const times = { uses: 1, expireTime: new Date(now + 30 * 60000).toISOString(), newSessionExpireTime: new Date(now + 2 * 60000).toISOString() };
+  const setup = { model: `models/${config.live.model}`, generationConfig: { responseModalities: ['AUDIO'] }, sessionResumption: {} };
+  // Raw REST names the constraint "bidiGenerateContentSetup" (the SDKs call it liveConnectConstraints).
+  // Try the documented variants in order and remember which API version issued the token.
+  const attempts = [
+    ['v1alpha', { ...times, bidiGenerateContentSetup: setup }],
+    ['v1beta', { ...times, bidiGenerateContentSetup: setup }],
+    ['v1alpha', times],
+  ];
+  let last;
+  for (const [ver, body] of attempts) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/${ver}/auth_tokens`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.keys.gemini }, body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.name) return { token: j.name, model: config.live.model, version: ver, locked: !!body.bidiGenerateContentSetup, expiresAt: times.expireTime };
+    last = Object.assign(new Error(`Gemini ${r.status}: ${j.error?.message ?? 'could not start a live session'}`), { status: r.status || 502 });
+  }
+  throw last;
 }

@@ -132,7 +132,7 @@ test('live returns a short-lived token and endpoints, never the API key', async 
   const j = await (await post('/v1/live', {}, token)).json();
   assert.equal(j.token, 'auth_tokens/mock-live-token');
   assert.equal(j.endpoints.length, 2);
-  assert.match(j.endpoints[0], /^wss:\/\/generativelanguage\.googleapis\.com\/ws\/.*v1beta.*BidiGenerateContentConstrained\?access_token=/);
+  assert.match(j.endpoints[0], /^wss:\/\/generativelanguage\.googleapis\.com\/ws\/.*v1alpha.*BidiGenerateContentConstrained\?access_token=/);
   assert.ok(!JSON.stringify(j).includes('test-secret'));
   assert.equal((await post('/v1/live', {})).status, 401);
 });
