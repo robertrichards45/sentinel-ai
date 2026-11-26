@@ -86,7 +86,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>SENTINEL AI 0.1.0 · unofficial · not affiliated with the glasses maker</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>SENTINEL AI 0.1.1 · unofficial · not affiliated with the glasses maker</Text>
     </ScrollView>
   );
 }

@@ -2,8 +2,31 @@ import * as Speech from 'expo-speech';
 import { AudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { getSettings } from './settings';
 
-/** 16 kHz mono AAC: small uploads; matches the glasses' Bluetooth mic bandwidth. */
-export const VOICE_PRESET = { ...RecordingPresets.HIGH_QUALITY, sampleRate: 16000, numberOfChannels: 1, bitRate: 64000 };
+/**
+ * Recording settings, tried in order. v0.1.0 build 2 used 16 kHz mono @ 64 kbps AAC,
+ * which iOS refused on a real iPhone (AVAudioRecorder.prepareToRecord() == false),
+ * so we start from Expo's stock presets, which are known-good, and fall back.
+ */
+export const VOICE_PRESET = RecordingPresets.HIGH_QUALITY;
+export const VOICE_CANDIDATES = [
+  { label: 'AAC 44.1 kHz mono 64 kbps', options: { ...RecordingPresets.HIGH_QUALITY, numberOfChannels: 1, bitRate: 64000 } },
+  { label: 'AAC 44.1 kHz stereo 128 kbps (stock)', options: RecordingPresets.HIGH_QUALITY },
+  { label: 'AAC low quality (stock)', options: RecordingPresets.LOW_QUALITY },
+];
+
+/** Prepare the recorder with the first settings iOS accepts. Returns the label used. */
+export async function prepareRecorder(rec: AudioRecorder): Promise<string> {
+  const errors: string[] = [];
+  for (const c of VOICE_CANDIDATES) {
+    try {
+      await rec.prepareToRecordAsync(c.options);
+      return c.label;
+    } catch (e: any) {
+      errors.push(`${c.label}: ${String(e?.message ?? e).split('\n').pop()}`);
+    }
+  }
+  throw new Error('The iPhone refused every recording setting.\n' + errors.join('\n'));
+}
 
 /**
  * Puts iOS in play-and-record mode. expo-audio adds .allowBluetoothHFP in this mode

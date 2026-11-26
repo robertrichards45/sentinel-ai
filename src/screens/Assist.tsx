@@ -8,7 +8,7 @@ import { allModes } from '../modeStore';
 import { onGlassesButton } from '../glassesState';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
-import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking } from '../voice';
+import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder } from '../voice';
 import { Btn, C, Card, S } from '../ui';
 
 export default function Assist() {
@@ -31,17 +31,21 @@ export default function Assist() {
     finally { setBusy(false); }
   };
 
+  const pressingRef = useRef(false);
   const start = async () => {
+    pressingRef.current = true; setErr('');
     try {
       stopSpeaking();
       await enableVoiceSession();
-      await rec.prepareToRecordAsync();
-      setMic(await chooseInput(rec));
+      const fmt = await prepareRecorder(rec);
+      setMic(`${await chooseInput(rec)} · ${fmt}`);
+      if (!pressingRef.current) return; // released while preparing: don't start a stray recording
       rec.record();
       listeningRef.current = true; setListening(true);
     } catch (e: any) { setErr(String(e?.message ?? e)); }
   };
   const stop = async () => {
+    pressingRef.current = false;
     if (!listeningRef.current) return;
     listeningRef.current = false; setListening(false);
     await rec.stop();
