@@ -17,6 +17,8 @@ import { setPhoneMic } from '../micState';
 import { goToSleep, wakeUp } from '../quiet';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
 import { Orb, VoiceBars, OrbState } from '../Orb';
+import { LiveCamera } from '../LiveCamera';
+import { onLook } from '../triggers';
 import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
 
 const HINT: Record<string, string> = {
@@ -107,6 +109,8 @@ export default function Assist() {
     setPhoneMic(false);
   };
   const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
+  const [look, setLook] = useState(false);
+  useEffect(() => onLook((on) => setLook(on)), []);
   useEffect(() => onListenRequest(() => (s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
 
   const start = async (fromHandsFree = false) => {
@@ -208,6 +212,10 @@ export default function Assist() {
       </View>
       {attached ? <Text style={[S.dim, { textAlign: 'center' }]} numberOfLines={1}>Ask anything about "{attached.name}". Tap Done to stop.</Text> : null}
 
+      {look ? <LiveCamera onClose={() => setLook(false)} /> : null}
+      {s.liveConversation ? (
+        <Btn kind={look ? 'primary' : 'ghost'} icon={look ? 'eye-off-outline' : 'eye-outline'} title={look ? 'Stop showing Alice' : 'Show Alice (live camera)'} onPress={() => setLook(!look)} />
+      ) : null}
       {mode.wantsImage || liveOn ? (
         <View style={S.row}>
           <Btn style={{ flex: 1 }} icon="camera-outline" title="Take photo" onPress={async () => { const i = await snap(false); if (i) (liveOn ? live.sendImage(i) : run({ imageBase64: i })); }} />

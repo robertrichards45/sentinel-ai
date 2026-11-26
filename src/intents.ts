@@ -22,6 +22,7 @@ export type Action =
   | { type: 'timer'; seconds: number; label?: string }
   | { type: 'alarm'; at: string; label?: string }
   | { type: 'cancel_timers' }
+  | { type: 'show_camera'; on: boolean }
   | { type: 'play_music'; query: string; app?: string }
   | { type: 'translator'; language?: string; on: boolean }
   | { type: 'save_spot'; label?: string }
@@ -82,6 +83,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'timer': { const n = Number(a.seconds); const label = str(a.label, 40); return Number.isFinite(n) && n >= 1 && n <= 86400 ? { type: 'timer', seconds: Math.round(n), ...(label ? { label } : {}) } : null; }
     case 'alarm': { const at = str(a.at, 40); const label = str(a.label, 60); return at && !isNaN(Date.parse(at)) ? { type: 'alarm', at, ...(label ? { label } : {}) } : null; }
     case 'cancel_timers': return { type: 'cancel_timers' };
+    case 'show_camera': return { type: 'show_camera', on: a.on !== false };
     case 'play_music': { const query = str(a.query, 120); const app = str(a.app, 20); return query ? { type: 'play_music', query, ...(app ? { app } : {}) } : null; }
     case 'translator': { const language = str(a.language, 40); return { type: 'translator', on: a.on !== false, ...(language ? { language } : {}) }; }
     case 'look_up': { const query = str(a.query, 300); return query ? { type: 'look_up', query } : null; }

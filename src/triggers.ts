@@ -22,3 +22,17 @@ export const isTalkLink = (url?: string | null) => !!url && /^alice:\/\/(talk|li
 let wakeHandler: Fn | null = null;
 export const onWake = (fn: Fn) => { wakeHandler = fn; return () => { if (wakeHandler === fn) wakeHandler = null; }; };
 export const wake = () => { if (wakeHandler) wakeHandler(); else requestListen(); };
+
+/** Open / close the live camera view ("Show Alice"), e.g. when you ask "what am I looking at?". */
+type LookFn = (on: boolean) => void;
+let lookHandler: LookFn | null = null;
+let pendingLook: boolean | null = null;
+export const onLook = (fn: LookFn) => {
+  lookHandler = fn;
+  if (pendingLook !== null) { const v = pendingLook; pendingLook = null; setTimeout(() => fn(v), 300); }
+  return () => { if (lookHandler === fn) lookHandler = null; };
+};
+export const setLook = (on: boolean) => {
+  if (lookHandler) lookHandler(on);
+  else { pendingLook = on; if (on && wakeHandler) wakeHandler(); } // opens the Talk screen, which shows the camera
+};

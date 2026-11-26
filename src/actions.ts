@@ -1,3 +1,4 @@
+import { setLook } from './triggers';
 import { callContact, textContact, setTimer, setAlarm, cancelTimers, playMusic } from './comms';
 import { restartLiveSoon } from './liveRestart';
 import { respond } from './ai';
@@ -121,6 +122,9 @@ export async function runAction(a: Action): Promise<string> {
     case 'timer': return setTimer(a.seconds, a.label);
     case 'alarm': return setAlarm(a.at, a.label);
     case 'cancel_timers': return cancelTimers();
+    case 'show_camera':
+      setLook(a.on);
+      return a.on ? 'Camera is on. Point your phone at it and I will tell you what I see.' : 'Camera off.';
     case 'play_music': return playMusic(a.query, a.app);
     case 'translator': {
       if (a.on) {
