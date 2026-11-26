@@ -64,7 +64,8 @@ class LiveSession {
   /** Screens subscribe while visible; the conversation itself keeps running (other tabs, locked phone). */
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
-  private set(s: LiveState, detail?: string) { setPhoneMic(s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+  spokeAt = 0;
+  private set(s: LiveState, detail?: string) { if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
   async start() {
     if (this.state !== 'off' && this.state !== 'error') return;
@@ -153,6 +154,9 @@ class LiveSession {
     rec.onAudioReady({ sampleRate: 16000, bufferLength: 1600, channelCount: 1 }, ({ buffer }) => {
       const ws = this.ws;
       if (!ws || ws.readyState !== 1) return;
+      // Half-duplex: while Alice is talking (and 0.5 s after), don't send the mic. Through Bluetooth glasses the
+      // echo cancellation can't fully remove her own voice, so she heard herself and talked over you.
+      if (this.state === 'speaking' || Date.now() - this.spokeAt < 500) return;
       let f: Float32Array = buffer.getChannelData(0);
       if (buffer.sampleRate !== 16000) f = resampleLinear(f, buffer.sampleRate, 16000);
       const pcm = floatToPcm16(f);

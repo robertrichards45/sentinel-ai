@@ -57,7 +57,10 @@ function endSession() {
 
 async function followUp() {
   // After Alice has finished speaking, open the glasses mic again for a follow-up.
-  while (speaking) await new Promise((r) => setTimeout(r, 200));
+  // Wait until Alice has finished talking (normal voice or live conversation), plus a short gap, so the
+  // glasses' mic doesn't pick up her own voice.
+  while (speaking || live.state === 'speaking' || live.state === 'thinking') await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 500));
   if (!session) return;
   await cmd('micOn');
   startTurn();
