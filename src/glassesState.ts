@@ -10,14 +10,15 @@ export type GlassesState = {
   ssid?: string;
   mediaCount?: number; // verified meaning
   heartbeat?: number; // LIKELY battery %
-  busy: boolean; // LIKELY camera/mic active
+  busy: boolean; // camera OR the AI microphone is active
+  aiListening: boolean; // the glasses' AI microphone is on (54 12 04 .. 54 12 00, or mic audio flowing)
   busySince?: number;
   clockSkewSec?: number; // glasses clock minus phone clock
   lastPacket?: number;
   newMediaSinceImport: number;
 };
 
-let s: GlassesState = { link: 'idle', busy: false, newMediaSinceImport: 0 };
+let s: GlassesState = { link: 'idle', busy: false, aiListening: false, newMediaSinceImport: 0 };
 let importedCount: number | undefined;
 let lowWarned = false;
 const listeners = new Set<(g: GlassesState) => void>();
@@ -34,7 +35,9 @@ let voiceSeen = false;
 glasses.on((e: any) => {
   const now = Date.now();
   switch (e.kind) {
-    case 'voice': if (e.on) voiceSeen = true; break;
+    case 'voice': if (e.on) voiceSeen = true; set({ aiListening: e.on }); break;
+    case 'voiceAudio': voiceSeen = true; if (!s.aiListening) set({ aiListening: true }); break;
+    case 'voiceEnd': set({ aiListening: false }); break;
     case 'link': set({ link: e.state, linkDetail: e.detail }); break;
     case 'address': set({ mac: e.mac, ssid: ssidFromMac(e.mac) }); break;
     case 'mediaCount':
@@ -53,7 +56,7 @@ glasses.on((e: any) => {
     case 'clock': set({ clockSkewSec: Math.round(e.unixSeconds - now / 1000) }); break;
     case 'busy': {
       const rising = e.on && !s.busy;
-      set({ busy: e.on, busySince: e.on ? now : undefined, lastPacket: now });
+      set({ busy: e.on, busySince: e.on ? now : undefined, lastPacket: now, ...(e.on ? {} : { aiListening: false }) });
       // The busy flag rises for a photo, a video AND the AI microphone, so don't announce it.
       // Photos are announced when the photo count rises; a long busy with no voice is a video.
       if (rising && getSettings().announceRecording) {

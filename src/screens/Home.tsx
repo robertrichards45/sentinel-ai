@@ -51,7 +51,7 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
         </Glass>
       </Pressable>
 
-      {g.busy ? (
+      {g.busy && !g.aiListening && busySec >= 4 ? (
         <Card tone="alert">
           <View style={S.row}><Ionicons name="radio-button-on" size={18} color={C.red} /><Text style={[S.h2, { color: C.red }]}>Camera is recording{busySec ? ` · ${busySec} s` : ''}</Text></View>
           <Text style={S.dim}>Don't plug the glasses into USB until it stops. Plugging in mid-recording is what overwrote a photo before.</Text>
