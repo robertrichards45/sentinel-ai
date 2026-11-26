@@ -1,3 +1,4 @@
+import { respond } from './ai';
 import { readJson, writeJson } from './storage';
 import { agendaText } from './agenda';
 import { goToSleep } from './quiet';
@@ -112,6 +113,20 @@ export async function runAction(a: Action): Promise<string> {
       await Linking.openURL(`maps://?daddr=${s.lat},${s.lon}&dirflg=w`);
       const ago = Math.round((Date.now() - s.at) / 60000);
       return `Your ${a.label || 'car'} is ${s.near ? 'near ' + s.near : 'where you saved it'}, saved ${ago < 60 ? ago + ' minutes' : Math.round(ago / 60) + ' hours'} ago. Walking directions are in Apple Maps.`;
+    }
+    case 'briefing': {
+      // Your day in one go: schedule, weather where you are, and the top headlines.
+      const [agenda, weather, news] = await Promise.all([
+        agendaText(1).catch(() => ''),
+        runAction({ type: 'weather' } as Action).catch(() => ''),
+        runAction({ type: 'look_up', query: 'top 3 news headlines today, one line each' } as Action).catch(() => ''),
+      ]);
+      return [agenda, weather, news].filter(Boolean).join(' ');
+    }
+    case 'look_up': {
+      // Live facts from the web through Alice's server (Google Search, verified working).
+      const r = await respond('general', `Today is ${new Date().toDateString()}. Search the web and answer the question with current facts in 2-4 short spoken sentences. Include dates and numbers. No URLs.`, [], a.query);
+      return r.text || 'I could not find anything on that.';
     }
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye

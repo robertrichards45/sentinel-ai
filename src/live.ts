@@ -38,6 +38,8 @@ const TOOLS = [
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
   { name: 'save_spot', description: 'Remember the user\'s current location, e.g. where they parked. label defaults to car.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
   { name: 'find_spot', description: 'Where did I park / take me back to a saved spot. Opens walking directions.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
+  { name: 'briefing', description: 'Daily briefing: today\'s schedule, the weather here and the top headlines. Use for "brief me", "good morning", "what does my day look like".', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'look_up', description: 'Search the web for current, live information: news, sports scores, stock and crypto prices, events, opening hours, people in the news, anything recent or that changes. Use it whenever you are not sure your knowledge is current.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' } }, required: ['query'] } },
   { name: 'stop_listening', description: 'End the conversation and stop listening when the user says stop listening, go to sleep, that\'s all, be quiet, or similar.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'report_problem', description: 'Add a problem report to Alice\'s diagnostic log, in the user\'s words, when they say something went wrong ("log that", "that didn\'t work", "note a problem").', parameters: { type: 'OBJECT', properties: { text: { type: 'STRING' } }, required: ['text'] } },
   { name: 'weather', description: 'Live weather and forecast. Omit place for the user\'s current location.', parameters: { type: 'OBJECT', properties: { place: { type: 'STRING' }, days: { type: 'NUMBER' } } } },
@@ -134,7 +136,7 @@ class LiveSession {
       mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
-      `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS use Google Search first and answer from what you find. Never say you cannot access current information.`,
+      `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
     ].filter(Boolean).join('\n\n');
     return { setup: {

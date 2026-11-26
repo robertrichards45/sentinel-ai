@@ -15,6 +15,8 @@ export type Action =
   | { type: 'weather'; place?: string; days?: number }
   | { type: 'report_problem'; text: string }
   | { type: 'stop_listening' }
+  | { type: 'look_up'; query: string }
+  | { type: 'briefing' }
   | { type: 'save_spot'; label?: string }
   | { type: 'find_spot'; label?: string }
   | { type: 'glasses_status' }
@@ -67,6 +69,8 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'glasses_status': return { type: 'glasses_status' };
     case 'agenda': { const d = Number(a.days); return Number.isFinite(d) && d >= 1 && d <= 31 ? { type: 'agenda', days: Math.round(d) } : { type: 'agenda' }; }
     case 'stop_listening': return { type: 'stop_listening' };
+    case 'briefing': return { type: 'briefing' };
+    case 'look_up': { const query = str(a.query, 300); return query ? { type: 'look_up', query } : null; }
     case 'save_spot': { const label = str(a.label, 60); return label ? { type: 'save_spot', label } : { type: 'save_spot' }; }
     case 'find_spot': { const label = str(a.label, 60); return label ? { type: 'find_spot', label } : { type: 'find_spot' }; }
     case 'report_problem': { const text = str(a.text, 600); return text ? { type: 'report_problem', text } : null; }
@@ -111,6 +115,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"weather","place":"optional city; omit for the user's location","days":1}   live forecast; use for any weather question
 {"type":"save_spot","label":"car"}   "remember where I parked", "save this spot"
 {"type":"find_spot","label":"car"}   "where did I park?", "take me back to my car"
+{"type":"briefing"}   "brief me", "good morning", "what's my day look like": schedule + weather + headlines
 {"type":"stop_listening"}   when the user says stop listening, go to sleep, that's all, leave me alone, be quiet, or ends the conversation
 {"type":"report_problem","text":"what went wrong, in the user's words"}   when the user reports a problem or bug with you, the app or the glasses ("note that...", "log a problem", "that didn't work")
 {"type":"glasses_status"}
