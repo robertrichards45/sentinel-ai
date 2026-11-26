@@ -14,6 +14,7 @@ import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
 import { live } from './live';
 import { getSettings } from './settings';
+import { runSpeakerTestIfArmed } from './speakerTest';
 
 type Listener = { state?: (s: 'listening' | 'thinking' | 'idle') => void; exchange?: (e: Exchange) => void; error?: (m: string) => void };
 const listeners = new Set<Listener>();
@@ -29,6 +30,7 @@ async function finish() {
   if (!recording) return;
   recording = false;
   const f = frames; frames = [];
+  if (getSettings().speakerTestArmed) { emit('state', 'idle'); runSpeakerTestIfArmed(); return; } // test turn: no AI reply, so only the glasses could make sound
   if (f.length < 5 || getSettings().privacyMode) { emit('state', 'idle'); return; } // < 0.2 s: nothing said
   if (busy) return; // one turn at a time
   busy = true; emit('state', 'thinking');

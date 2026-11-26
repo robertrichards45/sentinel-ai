@@ -118,6 +118,16 @@ class GlassesLink {
     await this.device.writeCharacteristicWithResponseForService(svc, characteristic, Buffer.from(bytes).toString('base64'));
   }
 
+  /**
+   * Glasses speaker test ONLY (approved, one-shot): writes to the audio characteristic 57FF/33F5 and nothing else.
+   * Independent of WRITES_ENABLED, which stays off for every other command. FEF5 can never be reached from here.
+   */
+  async speakerTestWrite(bytes: Uint8Array) {
+    if (!this.device) throw new Error('Not connected');
+    this.record('W:57ff', bytes);
+    await this.device.writeCharacteristicWithResponseForService(UUID.SVC_B, UUID.B_WRITE, Buffer.from(bytes).toString('base64'));
+  }
+
   async disconnect() {
     this.wantConnected = false;
     const d = this.device;

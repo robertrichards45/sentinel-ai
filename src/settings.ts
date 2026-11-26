@@ -20,6 +20,7 @@ export type Settings = {
   voiceStyle: string; // id from VOICE_STYLES in voice.ts
   voicePitch: number; // -2 (deeper) .. +2 (higher)
   modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
+  speakerTestArmed: boolean; // one-shot: after the next glasses recording, send a test clip to the glasses' audio channel
   liveConversation: boolean; // real-time, interruptible conversation (Gemini Live) instead of one question at a time
 };
 
@@ -45,6 +46,7 @@ export const DEFAULTS: Settings = {
   voicePitch: 0,
   modeVoices: {},
   liveConversation: true,
+  speakerTestArmed: false,
 };
 
 let cache: Settings = DEFAULTS;
