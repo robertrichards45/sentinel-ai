@@ -157,7 +157,7 @@ export default function Settings() {
         <Text style={S.dim}>Commands to glasses: {WRITES_ENABLED ? 'on' : 'off (read-only)'}. Firmware-update service: always blocked. Packets logged: {glasses.log.length}.</Text>
         <Btn kind="ghost" title="Share Bluetooth log" disabled={!glasses.log.length} onPress={exportLog} />
         <Btn kind="ghost" title="Share diagnostic diary" onPress={exportDiary} />
-        <Text style={S.dim}>The diary records events only (connections, commands, reply times, errors), never what you say. It is also sent to Alice's server unless Privacy mode is on.</Text>
+        <Text style={S.dim}>The diary records events only (connections, commands, reply times, errors), never what you say, except problems you report ("Alice, log a problem: ..."). It is also sent to Alice's server unless Privacy mode is on.</Text>
       </Card>
 
       <Card title="Feature status" right={<Btn kind="ghost" title={showMatrix ? 'Hide' : 'Show'} onPress={() => setShowMatrix(!showMatrix)} />}>

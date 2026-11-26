@@ -61,3 +61,6 @@ load().then(() => note('app-start'));
 setInterval(save, 20000);
 setInterval(upload, 4 * 60 * 1000);
 setTimeout(upload, 30000);
+
+/** Save now and send soon (used when the user reports a problem). */
+export const flushDiary = () => { dirty = true; save(); setTimeout(upload, 2000); };

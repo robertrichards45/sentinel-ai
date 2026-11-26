@@ -13,6 +13,7 @@ export type Action =
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
   | { type: 'weather'; place?: string; days?: number }
+  | { type: 'report_problem'; text: string }
   | { type: 'glasses_status' }
   | { type: 'set_mode'; mode: string }
   | { type: 'document'; title: string; format: 'pdf' | 'text'; content: string };
@@ -60,6 +61,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
       return { type: 'weather', ...(place ? { place } : {}), ...(Number.isFinite(d) && d >= 1 && d <= 7 ? { days: Math.round(d) } : {}) };
     }
     case 'glasses_status': return { type: 'glasses_status' };
+    case 'report_problem': { const text = str(a.text, 600); return text ? { type: 'report_problem', text } : null; }
     case 'set_mode': return knownModes.includes(a.mode) ? { type: 'set_mode', mode: a.mode } : null;
     case 'document': {
       const title = str(a.title, 120), content = str(a.content, 40000);
@@ -99,6 +101,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"navigate","destination":"...","mode":"walking|driving|transit"}
 {"type":"where_am_i"}
 {"type":"weather","place":"optional city; omit for the user's location","days":1}   live forecast; use for any weather question
+{"type":"report_problem","text":"what went wrong, in the user's words"}   when the user reports a problem or bug with you, the app or the glasses ("note that...", "log a problem", "that didn't work")
 {"type":"glasses_status"}
 {"type":"set_mode","mode":"<mode id>"}
 {"type":"document","title":"...","format":"pdf|text","content":"<the COMPLETE document in Markdown: # title, ## headings, - lists, | tables |>"}
