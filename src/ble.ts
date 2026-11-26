@@ -1,6 +1,6 @@
 import { BleManager, Device, Subscription, State } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
-import { getSettings } from './settings';
+import { getSettings, onSettings } from './settings';
 import { GLASSES_COMMANDS, GlassesCommand, UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
 
 export type LinkState = 'bluetooth-off' | 'idle' | 'scanning' | 'connecting' | 'connected' | 'error';
@@ -107,7 +107,7 @@ class GlassesLink {
     watch(UUID.SVC_C, UUID.C_NOTIFY, 'C', (b) => ({ kind: 'raw', channel: 'C', hex: hex(b), confidence: 'unknown' }));
     this.setState('connected');
     // Headset mode: ask the glasses to join the iPhone as Bluetooth headphones, so Alice (and music) play through them.
-    if (getSettings().glassesAudio) this.glassesCommand('audioOn').catch(() => {});
+    setTimeout(() => { if (getSettings().glassesAudio) this.syncAudio(); }, 500);
   }
 
   /** The ONLY write path in the app. Blocks the firmware-update service unconditionally. */
@@ -129,10 +129,28 @@ class GlassesLink {
   async glassesCommand(name: GlassesCommand) {
     const hexStr = GLASSES_COMMANDS[name];
     if (!hexStr) throw new Error('BLOCKED: unknown command');
-    if (!this.device) throw new Error('Not connected');
     const bytes = new Uint8Array(Buffer.from(hexStr, 'hex'));
-    this.record('W:57ff', bytes);
-    await this.device.writeCharacteristicWithResponseForService(UUID.SVC_B, UUID.B_WRITE, Buffer.from(bytes).toString('base64'));
+    try {
+      if (!this.device) throw new Error('glasses not connected');
+      this.record('W:57ff', bytes);
+      await this.device.writeCharacteristicWithResponseForService(UUID.SVC_B, UUID.B_WRITE, Buffer.from(bytes).toString('base64'));
+      this.lastCommand = { name, at: Date.now() };
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      this.log.push({ t: Date.now(), ch: 'ERR', hex: `${name}: ${msg}` });
+      this.lastCommand = { name, at: Date.now(), error: msg };
+      throw e;
+    } finally {
+      this.emit({ kind: 'command', ...this.lastCommand });
+    }
+  }
+  lastCommand: { name: GlassesCommand; at: number; error?: string } | null = null;
+
+  /** Keep headset mode in step with the setting: on connect, once settings have loaded, and when toggled. */
+  syncAudio() {
+    if (this.state !== 'connected') return;
+    const want = getSettings().glassesAudio;
+    this.glassesCommand(want ? 'audioOn' : 'audioOff').catch(() => {});
   }
 
   async disconnect() {
@@ -151,3 +169,11 @@ class GlassesLink {
 }
 
 export const glasses = new GlassesLink();
+
+// Settings load after the app may already have connected: re-send headset mode when the setting is (re)read or changed.
+let lastWant: boolean | null = null;
+onSettings((s) => {
+  if (s.glassesAudio === lastWant) return;
+  lastWant = s.glassesAudio;
+  glasses.syncAudio();
+});
