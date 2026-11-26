@@ -8,7 +8,7 @@ import { readJsonArray, writeJson } from './storage';
 import { markImported } from './glassesState';
 
 export type ImportResult = { name: string; status: 'saved' | 'duplicate' | 'damaged' | 'error'; note?: string };
-const ALBUM = 'SENTINEL Glasses';
+const ALBUM = 'Alice Glasses';
 
 /**
  * Import photos/videos picked in the Files app (e.g. the glasses' USB drive on a

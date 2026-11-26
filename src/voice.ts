@@ -51,11 +51,18 @@ export async function chooseInput(rec: AudioRecorder): Promise<string> {
   }
 }
 
+/** Lets the orb glow while Alice is talking. */
+const speakingListeners = new Set<(on: boolean) => void>();
+export const onSpeaking = (fn: (on: boolean) => void) => { speakingListeners.add(fn); return () => { speakingListeners.delete(fn); }; };
+const setSpeaking = (on: boolean) => speakingListeners.forEach((f) => f(on));
+
 export function speak(text: string, language?: string): Promise<void> {
   const s = getSettings();
   return new Promise((resolve) => {
+    const done = () => { setSpeaking(false); resolve(); };
     Speech.stop();
-    Speech.speak(text, { language: language ?? s.voiceLanguage, rate: s.speechRate, onDone: resolve, onStopped: resolve, onError: () => resolve() });
+    setSpeaking(true);
+    Speech.speak(text, { language: language ?? s.voiceLanguage, rate: s.speechRate, onDone: done, onStopped: done, onError: done });
   });
 }
 export const stopSpeaking = () => Speech.stop();

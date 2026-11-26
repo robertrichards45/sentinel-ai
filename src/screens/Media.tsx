@@ -21,7 +21,7 @@ export default function Media() {
       </Card>
 
       <Card title="Import from Files / USB">
-        <Text style={S.dim}>Open the glasses' drive (USB-C iPhones show it in Files) or files you AirDropped from your PC. SENTINEL checks every file, skips duplicates, flags damaged ones and fixes the one-month-behind photo dates. Originals are never changed.</Text>
+        <Text style={S.dim}>Open the glasses' drive (USB-C iPhones show it in Files) or files you AirDropped from your PC. Alice checks every file, skips duplicates, flags damaged ones and fixes the one-month-behind photo dates. Originals are never changed.</Text>
         <Btn title={busy ? 'Importing…' : 'Choose files'} disabled={busy} onPress={async () => {
           setBusy(true); setResults([]);
           try { await importFromFiles((r) => setResults((x) => [...x, r])); }

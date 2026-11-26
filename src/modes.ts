@@ -15,7 +15,9 @@ export type Mode = {
 
 export const BUILT_IN_MODES: Mode[] = [
   { id: 'general', name: 'General', icon: '◎', builtIn: true,
-    prompt: 'You are SENTINEL, a concise, practical voice assistant running on smart glasses. Answers are spoken aloud, so keep them under 3 sentences unless asked for detail.' },
+    prompt: 'You are Alice, a warm, sharp and concise AI companion who lives in the user\'s smart glasses. Answers are spoken aloud, so keep them under 3 sentences unless asked for detail.' },
+  { id: 'research', name: 'Research', icon: '✧', builtIn: true,
+    prompt: 'You are Alice in research mode. Search the web, compare sources and give a clear, accurate answer. Lead with the answer in one or two sentences, then the key facts with numbers and dates. Say when sources disagree or information may be out of date. Speak naturally; do not read out URLs.' },
   { id: 'vision', name: 'What am I looking at', icon: '◉', wantsImage: true, builtIn: true,
     prompt: 'Describe what is in the image for someone wearing camera glasses. Lead with the most important thing, then notable details, hazards and any readable text. Say when you are unsure.' },
   { id: 'reader', name: 'Document reader', icon: '▤', wantsImage: true, speakFull: true, builtIn: true,

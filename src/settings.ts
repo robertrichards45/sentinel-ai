@@ -14,12 +14,14 @@ export type Settings = {
   lowBatteryAlert: number; // % (heartbeat value is only LIKELY battery)
   activeMode: string;
   confirmActions: boolean; // always ask before creating reminders/events/emails
+  serverUrl: string; // blank = Alice's hosted server
+  providerOverride: '' | 'gemini' | 'openai'; // testing only; server must allow it
 };
 
-/** Model IDs checked against OpenAI docs on 2026-11-25. Editable in Settings. */
+/** AI models are chosen on Alice's server (server/src/config.mjs), not on the phone. */
 export const DEFAULTS: Settings = {
-  chatModel: 'gpt-6-luna',
-  transcribeModel: 'gpt-transcribe',
+  chatModel: '',
+  transcribeModel: '',
   translateTo: 'Spanish',
   voiceLanguage: 'en-US',
   speechRate: 1.0,
@@ -31,6 +33,8 @@ export const DEFAULTS: Settings = {
   lowBatteryAlert: 15,
   activeMode: 'general',
   confirmActions: true,
+  serverUrl: '',
+  providerOverride: '',
 };
 
 let cache: Settings = DEFAULTS;

@@ -1,5 +1,5 @@
 /**
- * SENTINEL AI feature matrix — the single source of truth shown in the app.
+ * Alice feature matrix — the single source of truth shown in the app.
  * Status meanings:
  *   tested     logic verified by automated tests on the PC (real glasses data where possible)
  *   built      code written and compiles; NOT yet tested on the iPhone
@@ -50,7 +50,7 @@ export const FEATURES: Feature[] = [
   { id: 'where', area: 'Location', name: 'Where am I', status: 'built', detail: 'GPS + street address spoken.' },
   { id: 'nav', area: 'Location', name: 'Spoken navigation', status: 'partial', detail: 'Hands off to Apple Maps, whose voice plays through the glasses.' },
   // Voice
-  { id: 'wake-word', area: 'Voice', name: 'Custom wake word ("Hey Sentinel")', status: 'proposed', detail: 'Needs an on-device speech module; iOS stops the mic when the app is fully closed.' },
+  { id: 'wake-word', area: 'Voice', name: 'Custom wake word ("Hey Alice")', status: 'proposed', detail: 'Needs an on-device speech module; iOS stops the mic when the app is fully closed.' },
   { id: 'offline', area: 'Voice', name: 'Offline basic commands', status: 'partial', detail: 'Status, time, glasses info and memory recall work offline via buttons; offline speech recognition is proposed.' },
   // Platform
   { id: 'privacy-mode', area: 'Privacy', name: 'Privacy mode + memory wipe', status: 'built', detail: 'One switch stops all cloud AI; one button erases memory.' },

@@ -17,7 +17,7 @@ export const memory = {
   async note(text: string) { state = core.addNote(state, text); await save(); },
   async turn(role: core.Turn['role'], text: string) { state = core.addTurn(state, role, text); await save(); },
   async clearHistory() { state = { ...state, history: [] }; await save(); },
-  /** Privacy: wipe everything SENTINEL remembers. */
+  /** Privacy: wipe everything Alice remembers. */
   async wipeAll() { state = core.EMPTY; deleteFile('memory.json'); listeners.forEach((l) => l(state)); },
   prompt: () => core.memoryPrompt(state),
 };

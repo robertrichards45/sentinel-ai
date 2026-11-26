@@ -53,6 +53,6 @@ jobs:
           ls -lh SENTINEL-AI-unsigned.ipa
       - uses: actions/upload-artifact@v4
         with:
-          name: SENTINEL-AI-unsigned-ipa
+          name: Alice-unsigned-ipa
           path: SENTINEL-AI-unsigned.ipa
           retention-days: 30

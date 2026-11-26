@@ -1,76 +1,79 @@
+import { File } from 'expo-file-system';
+import * as Crypto from 'expo-crypto';
 import { secret } from './storage';
 import { getSettings } from './settings';
 
 /**
- * OpenAI client. All traffic is HTTPS (TLS) to api.openai.com. The API key is read
- * from the iOS Keychain at call time and never logged or written to disk.
+ * Alice talks to AI through Alice's own server (server/ in this repo, hosted on Railway).
+ * The server holds the Gemini/OpenAI keys; the phone only holds a per-install token
+ * in the iOS Keychain. All traffic is HTTPS.
  */
-const BASE = 'https://api.openai.com/v1';
-export const KEY_NAME = 'openai_api_key';
+export const DEFAULT_SERVER = 'https://alice-server-production-4be3ccd5.up.railway.app';
+const TOKEN = 'alice_install_token';
+const INSTALL = 'alice_install_id';
 
 export class AIError extends Error {}
+export type Source = { title: string; url: string };
+export type AIAnswer = { text: string; provider: string; model: string; ms: number; sources: Source[]; costUsd: number | null };
 
-async function key(): Promise<string> {
-  if (getSettings().privacyMode) throw new AIError('Privacy mode is on: AI features are paused and nothing is sent off the phone.');
-  const k = await secret.get(KEY_NAME);
-  if (!k) throw new AIError('Add your OpenAI API key in Settings first.');
-  return k;
+const server = () => (getSettings().serverUrl || DEFAULT_SERVER).replace(/\/+$/, '');
+
+async function register(): Promise<string> {
+  let id = await secret.get(INSTALL);
+  if (!id) { id = Crypto.randomUUID().replace(/-/g, ''); await secret.set(INSTALL, id); }
+  const r = await fetch(server() + '/v1/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installId: id }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.token) throw new AIError(j.error ?? `Couldn't reach Alice's server (${r.status}).`);
+  await secret.set(TOKEN, j.token);
+  return j.token;
 }
 
-async function call(path: string, init: RequestInit, timeoutMs = 45000) {
+async function call(path: string, body: unknown, timeoutMs = 60000, retried = false): Promise<any> {
+  if (getSettings().privacyMode) throw new AIError('Privacy mode is on. Alice is offline and nothing leaves this iPhone.');
+  const token = (await secret.get(TOKEN)) ?? (await register());
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(BASE + path, { ...init, signal: ctl.signal });
-    const body = await r.text();
-    if (!r.ok) {
-      let msg = body.slice(0, 300);
-      try { msg = JSON.parse(body).error?.message ?? msg; } catch {}
-      throw new AIError(`OpenAI ${r.status}: ${msg}`);
-    }
-    return JSON.parse(body);
+    const r = await fetch(server() + path, {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && !retried) { await secret.del(TOKEN); return call(path, body, timeoutMs, true); }
+    if (!r.ok) throw new AIError(j.error ?? `Alice's server returned ${r.status}.`);
+    return j;
   } catch (e: any) {
-    if (e?.name === 'AbortError') throw new AIError('No answer from OpenAI in time. Check your connection.');
-    throw e;
+    if (e?.name === 'AbortError') throw new AIError('Alice took too long to answer. Check your connection and try again.');
+    if (e instanceof AIError) throw e;
+    throw new AIError("Couldn't reach Alice's server. Check your internet connection.");
   } finally {
-    clearTimeout(timer);
+    clearTimeout(t);
   }
 }
 
-/** Speech-to-text for a recorded audio file (m4a from the recorder). */
-export async function transcribe(fileUri: string, languageHint?: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', { uri: fileUri, name: 'speech.m4a', type: 'audio/m4a' } as any);
-  form.append('model', getSettings().transcribeModel);
-  if (languageHint) form.append('prompt', `Language hint: ${languageHint}`);
-  const j = await call('/audio/transcriptions', { method: 'POST', headers: { Authorization: `Bearer ${await key()}` }, body: form });
+/** Speech-to-text for a recorded file (m4a or wav). */
+export async function transcribe(fileUri: string): Promise<string> {
+  const audioBase64 = await new File(fileUri).base64();
+  const mime = /\.wav$/i.test(fileUri) ? 'audio/wav' : 'audio/m4a';
+  const j = await call('/v1/transcribe', { audioBase64, mime }, 45000);
   return String(j.text ?? '').trim();
 }
 
 export type ChatMsg = { role: 'user' | 'assistant'; text: string };
 
-/** Text (+ optional image) request via the Responses API. Returns the model's text. */
-export async function respond(instructions: string, history: ChatMsg[], userText: string, imageBase64Jpeg?: string): Promise<string> {
-  const input: any[] = history.map((m) => ({
-    role: m.role,
-    content: [{ type: m.role === 'user' ? 'input_text' : 'output_text', text: m.text }],
-  }));
-  const content: any[] = [{ type: 'input_text', text: userText }];
-  if (imageBase64Jpeg) content.push({ type: 'input_image', image_url: `data:image/jpeg;base64,${imageBase64Jpeg}` });
-  input.push({ role: 'user', content });
-  const j = await call('/responses', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${await key()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: getSettings().chatModel, instructions, input, store: false }),
-  }, 60000);
-  if (typeof j.output_text === 'string') return j.output_text;
-  const parts: string[] = [];
-  for (const item of j.output ?? []) for (const c of item.content ?? []) if (c.type === 'output_text') parts.push(c.text);
-  return parts.join('\n').trim();
+export async function respond(mode: string, system: string, history: ChatMsg[], text: string, imageBase64?: string): Promise<AIAnswer> {
+  const j = await call('/v1/respond', { mode, system, history, text, imageBase64, provider: getSettings().providerOverride || undefined });
+  return { text: String(j.text ?? ''), provider: j.provider ?? '?', model: j.model ?? '?', ms: j.ms ?? 0, sources: Array.isArray(j.sources) ? j.sources : [], costUsd: j.costUsd ?? null };
 }
 
-/** Cheap connectivity/key check for the Settings screen. */
-export async function testKey(): Promise<string> {
-  const t = await respond('Reply with exactly: OK', [], 'ping');
-  return t.trim();
+/** Settings screen: is the server reachable, which AI is active? */
+export async function serverStatus(): Promise<{ ok: boolean; providers: string[]; detail: string }> {
+  try {
+    const h = await (await fetch(server() + '/health')).json();
+    const providers: string[] = h.providers ?? [];
+    return { ok: !!h.ok, providers, detail: providers.length ? `Connected · AI: ${providers.join(', ')}` : 'Server is up, but no AI key is set on it yet.' };
+  } catch {
+    return { ok: false, providers: [], detail: "Can't reach Alice's server." };
+  }
 }

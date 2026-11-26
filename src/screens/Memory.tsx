@@ -14,7 +14,7 @@ export default function Memory() {
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
       <Title>Memory</Title>
       <Card>
-        <Toggle label="Personal memory" hint='SENTINEL only remembers what you ask it to ("remember that…"). Stored on this iPhone only.' value={s.memoryEnabled} onChange={(v) => updateSettings({ memoryEnabled: v })} />
+        <Toggle label="Personal memory" hint='Alice only remembers what you ask it to ("remember that…"). Stored on this iPhone only.' value={s.memoryEnabled} onChange={(v) => updateSettings({ memoryEnabled: v })} />
       </Card>
 
       <Card title={`Remembered facts (${m.facts.length})`}>
@@ -40,7 +40,7 @@ export default function Memory() {
         <Btn kind="ghost" title="Clear conversation" onPress={() => memory.clearHistory()} />
       </Card>
 
-      <Btn kind="danger" title="Erase all memory" onPress={() => Alert.alert('Erase everything SENTINEL remembers?', 'Facts, notes and conversation history will be deleted from this iPhone.', [
+      <Btn kind="danger" title="Erase all memory" onPress={() => Alert.alert('Erase everything Alice remembers?', 'Facts, notes and conversation history will be deleted from this iPhone.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Erase', style: 'destructive', onPress: () => memory.wipeAll() },
       ])} />

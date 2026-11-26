@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAudioRecorder } from 'expo-audio';
 import * as ImagePicker from 'expo-image-picker';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -8,13 +8,14 @@ import { allModes } from '../modeStore';
 import { onGlassesButton } from '../glassesState';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
-import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder } from '../voice';
-import { TalkLens } from '../Lens';
-import { Btn, C, Card, F, Ionicons, S } from '../ui';
+import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
+import { Orb, VoiceBars, OrbState } from '../Orb';
+import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
 
 const HINT: Record<string, string> = {
   general: 'Ask anything. Try "remind me to call the VA at 9 tomorrow".',
-  vision: 'Speak your question. A photo is taken when you let go.',
+  research: 'Ask a question that needs the web. Alice checks sources and says where they disagree.',
+  vision: 'Say your question. A photo is taken when you let go.',
   reader: 'Point at the page, then hold and say "read this".',
   scene: 'Hold and say "what should I watch out for".',
   mechanic: 'Describe the problem, then a photo is taken.',
@@ -29,6 +30,7 @@ export default function Assist() {
   const rec = useAudioRecorder(VOICE_PRESET);
   const [listening, setListening] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [speaking, setSpeakingState] = useState(false);
   const [mic, setMic] = useState('');
   const [typed, setTyped] = useState('');
   const [log, setLog] = useState<Exchange[]>([]);
@@ -36,6 +38,7 @@ export default function Assist() {
   const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
   const listeningRef = useRef(false);
   const pressingRef = useRef(false);
+  useEffect(() => onSpeaking(setSpeakingState), []);
 
   const run = async (o: Parameters<typeof ask>[0]) => {
     setBusy(true); setErr('');
@@ -78,34 +81,39 @@ export default function Assist() {
     return !r.canceled && r.assets?.[0]?.base64 ? r.assets[0].base64 : undefined;
   };
 
-  const hint = mode.id === 'translator' ? `Speak, and SENTINEL says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
+  const state: OrbState = listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
+  const status = listening ? 'Listening… let go to send' : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Hold Alice to talk';
+  const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20, paddingTop: 4 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
         {allModes().map((m) => {
           const on = m.id === mode.id;
           return (
-            <Pressable key={m.id} onPress={() => updateSettings({ activeMode: m.id })} accessibilityRole="button" accessibilityState={{ selected: on }}
-              style={{ paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, backgroundColor: on ? C.ink : C.panel, borderWidth: 1, borderColor: on ? C.ink : C.line }}>
-              <Text style={{ color: on ? '#FFFFFF' : C.ink, fontFamily: on ? F.semibold : F.regular, fontSize: 15 }}>{m.name}</Text>
+            <Pressable key={m.id} onPress={() => updateSettings({ activeMode: m.id })} accessibilityRole="button" accessibilityState={{ selected: on }}>
+              {on
+                ? <View style={{ paddingVertical: 9, paddingHorizontal: 15, borderRadius: 999, backgroundColor: C.violet, shadowColor: C.violet, shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }}>
+                    <Text style={{ color: '#FFFFFF', fontFamily: F.semibold, fontSize: 15 }}>{m.name}</Text>
+                  </View>
+                : <Glass radius={999} style={{ paddingVertical: 9, paddingHorizontal: 15 }}>
+                    <Text style={{ color: C.ink, fontFamily: F.regular, fontSize: 15 }}>{m.name}</Text>
+                  </Glass>}
             </Pressable>
           );
         })}
       </ScrollView>
 
-      <View style={{ gap: 6, marginTop: 4 }}>
-        <Text style={S.h1}>{mode.name}</Text>
-        <Text style={S.dim}>{hint}</Text>
+      <View style={{ alignItems: 'center', gap: 6 }}>
+        <Pressable onPressIn={start} onPressOut={stop} onPress={() => speaking && stopSpeaking()}
+          accessibilityRole="button" accessibilityLabel={listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
+          <Orb size={250} state={state} />
+        </Pressable>
+        <View style={{ height: 44, justifyContent: 'center' }}>
+          {listening ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
+        </View>
+        <Text style={[S.dim, { textAlign: 'center' }]}>{listening ? `Microphone: ${mic}` : hint}</Text>
       </View>
-
-      <View style={{ paddingVertical: 8 }}>
-        <TalkLens state={busy ? 'thinking' : listening ? 'listening' : 'idle'} onPressIn={start} onPressOut={stop}
-          label={listening ? 'Listening\nlet go to send' : 'Hold to talk'} />
-      </View>
-      <Text style={[S.dim, { textAlign: 'center' }]}>
-        {listening ? `Microphone: ${mic}` : busy ? 'Thinking…' : 'Answers play through the glasses when they are your headphones.'}
-      </Text>
 
       {mode.wantsImage ? (
         <View style={S.row}>
@@ -114,15 +122,15 @@ export default function Assist() {
         </View>
       ) : null}
 
-      <View style={[S.row, { backgroundColor: C.panel, borderRadius: 999, borderWidth: 1, borderColor: C.line, paddingLeft: 16, paddingRight: 6, paddingVertical: 6 }]}>
+      <Glass radius={999} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 6 }}>
         <TextInput style={{ flex: 1, fontFamily: F.regular, fontSize: 16, color: C.ink, paddingVertical: 8 }} value={typed} onChangeText={setTyped}
-          placeholder="Or type a question" placeholderTextColor="#98A3B3" returnKeyType="send" accessibilityLabel="Type a question"
+          placeholder="Or type to Alice" placeholderTextColor={C.faint} returnKeyType="send" accessibilityLabel="Type a question" keyboardAppearance="dark"
           onSubmitEditing={() => { if (typed) { run({ text: typed }); setTyped(''); } }} />
         <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!typed || busy} onPress={() => { run({ text: typed }); setTyped(''); }}
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: typed && !busy ? C.ink : C.line, alignItems: 'center', justifyContent: 'center' }}>
+          style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: typed && !busy ? C.violet : 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
         </Pressable>
-      </View>
+      </Glass>
 
       {err ? (
         <Card tone="alert">
@@ -132,18 +140,25 @@ export default function Assist() {
       ) : null}
 
       {log.map((e) => (
-        <View key={e.t} style={{ gap: 8 }}>
-          {e.you ? (
-            <View style={{ alignSelf: 'flex-end', maxWidth: '85%', backgroundColor: C.ink, borderRadius: 18, borderBottomRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10 }}>
-              <Text style={{ color: '#FFFFFF', fontFamily: F.regular, fontSize: 16, lineHeight: 22 }}>{e.you}</Text>
-            </View>
-          ) : null}
-          <View style={{ alignSelf: 'flex-start', maxWidth: '92%', backgroundColor: C.panel, borderRadius: 18, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: C.line, paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
-            <Text style={S.body} selectable>{e.sentinel}</Text>
+        <View key={e.t} style={{ gap: 10 }}>
+          {e.you ? <Text style={{ fontFamily: F.light, fontSize: 20, lineHeight: 27, color: C.sub, letterSpacing: -0.2 }} selectable>{e.you}</Text> : null}
+          <Glass style={{ padding: 16, gap: 8 }}>
+            <Text style={S.body} selectable>{e.alice}</Text>
             {e.outcomes.map((o, i) => (
-              <View key={i} style={S.row}><Ionicons name="checkmark-circle" size={16} color={C.teal} /><Text style={[S.dim, { color: C.teal, flex: 1 }]}>{o}</Text></View>
+              <View key={i} style={S.row}><Ionicons name="checkmark-circle" size={16} color={C.mint} /><Text style={[S.dim, { color: C.mint, flex: 1 }]}>{o}</Text></View>
             ))}
-          </View>
+            {e.sources?.length ? (
+              <View style={{ gap: 4, marginTop: 2 }}>
+                {e.sources.slice(0, 4).map((src, i) => (
+                  <Pressable key={i} onPress={() => Linking.openURL(src.url)} accessibilityRole="link" style={S.row}>
+                    <Ionicons name="link-outline" size={14} color={C.cyan} />
+                    <Text numberOfLines={1} style={[S.dim, { color: C.cyan, flex: 1 }]}>{src.title || src.url}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {e.via ? <Text style={[S.dim, { fontSize: 12, color: C.faint }]}>{e.via}{e.ms ? ` · ${(e.ms / 1000).toFixed(1)} s` : ''}</Text> : null}
+          </Glass>
         </View>
       ))}
     </ScrollView>

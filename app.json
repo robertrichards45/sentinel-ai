@@ -1,30 +1,30 @@
 {
   "expo": {
-    "name": "SENTINEL AI",
-    "slug": "sentinel-ai",
-    "version": "0.2.0",
+    "name": "Alice",
+    "slug": "alice",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "backgroundColor": "#EEF1F4",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#05060F",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
-        "CFBundleDisplayName": "SENTINEL AI",
-        "NSBluetoothAlwaysUsageDescription": "SENTINEL AI connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
-        "NSMicrophoneUsageDescription": "SENTINEL AI uses the glasses' microphone (or the iPhone's) for the voice assistant and translation.",
-        "NSCameraUsageDescription": "SENTINEL AI takes a photo when you ask it what you're looking at or to read a document.",
-        "NSPhotoLibraryAddUsageDescription": "SENTINEL AI saves photos and videos imported from your glasses to your photo library.",
-        "NSPhotoLibraryUsageDescription": "SENTINEL AI lets you pick a glasses photo for the AI to describe.",
-        "NSLocalNetworkUsageDescription": "SENTINEL AI talks to the glasses' own Wi-Fi hotspot to transfer media.",
-        "NSLocationWhenInUseUsageDescription": "SENTINEL AI tells you where you are and starts directions when you ask.",
-        "NSRemindersFullAccessUsageDescription": "SENTINEL AI creates reminders you ask for, after you confirm.",
-        "NSRemindersUsageDescription": "SENTINEL AI creates reminders you ask for, after you confirm.",
-        "NSCalendarsFullAccessUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
-        "NSCalendarsWriteOnlyAccessUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
-        "NSCalendarsUsageDescription": "SENTINEL AI adds calendar events you ask for, after you confirm.",
+        "CFBundleDisplayName": "Alice",
+        "NSBluetoothAlwaysUsageDescription": "Alice connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
+        "NSMicrophoneUsageDescription": "Alice uses the glasses' microphone (or the iPhone's) for the voice assistant and translation.",
+        "NSCameraUsageDescription": "Alice takes a photo when you ask it what you're looking at or to read a document.",
+        "NSPhotoLibraryAddUsageDescription": "Alice saves photos and videos imported from your glasses to your photo library.",
+        "NSPhotoLibraryUsageDescription": "Alice lets you pick a glasses photo for the AI to describe.",
+        "NSLocalNetworkUsageDescription": "Alice talks to the glasses' own Wi-Fi hotspot to transfer media.",
+        "NSLocationWhenInUseUsageDescription": "Alice tells you where you are and starts directions when you ask.",
+        "NSRemindersFullAccessUsageDescription": "Alice creates reminders you ask for, after you confirm.",
+        "NSRemindersUsageDescription": "Alice creates reminders you ask for, after you confirm.",
+        "NSCalendarsFullAccessUsageDescription": "Alice adds calendar events you ask for, after you confirm.",
+        "NSCalendarsWriteOnlyAccessUsageDescription": "Alice adds calendar events you ask for, after you confirm.",
+        "NSCalendarsUsageDescription": "Alice adds calendar events you ask for, after you confirm.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
@@ -43,50 +43,50 @@
           "modes": [
             "central"
           ],
-          "bluetoothAlwaysPermission": "SENTINEL AI connects to your G2 glasses over Bluetooth."
+          "bluetoothAlwaysPermission": "Alice connects to your G2 glasses over Bluetooth."
         }
       ],
       [
         "expo-secure-store",
         {
-          "faceIDPermission": "SENTINEL AI does not use Face ID."
+          "faceIDPermission": "Alice does not use Face ID."
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "SENTINEL AI uses the glasses' microphone for the voice assistant and translation."
+          "microphonePermission": "Alice uses the glasses' microphone for the voice assistant and translation."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.",
-          "savePhotosPermission": "SENTINEL AI saves imported glasses media to your photo library.",
+          "photosPermission": "Alice lets you pick a glasses photo for the AI to describe.",
+          "savePhotosPermission": "Alice saves imported glasses media to your photo library.",
           "isAccessMediaLocationEnabled": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "SENTINEL AI lets you pick a glasses photo for the AI to describe.",
-          "cameraPermission": "SENTINEL AI takes a photo when you ask it what you're looking at or to read a document.",
+          "photosPermission": "Alice lets you pick a glasses photo for the AI to describe.",
+          "cameraPermission": "Alice takes a photo when you ask it what you're looking at or to read a document.",
           "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "SENTINEL AI tells you where you are and starts directions when you ask.",
-          "locationAlwaysAndWhenInUsePermission": "SENTINEL AI only uses your location while the app is open.",
+          "locationWhenInUsePermission": "Alice tells you where you are and starts directions when you ask.",
+          "locationAlwaysAndWhenInUsePermission": "Alice only uses your location while the app is open.",
           "isIosBackgroundLocationEnabled": false
         }
       ],
       [
         "expo-calendar",
         {
-          "calendarPermission": "SENTINEL AI adds calendar events you ask for, after you confirm.",
-          "remindersPermission": "SENTINEL AI creates reminders you ask for, after you confirm."
+          "calendarPermission": "Alice adds calendar events you ask for, after you confirm.",
+          "remindersPermission": "Alice creates reminders you ask for, after you confirm."
         }
       ],
       "expo-mail-composer",
