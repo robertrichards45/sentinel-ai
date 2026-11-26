@@ -125,6 +125,7 @@ class LiveSession {
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
       mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
+      `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS use Google Search first and answer from what you find. Never say you cannot access current information.`,
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
     ].filter(Boolean).join('\n\n');
     return { setup: {

@@ -43,6 +43,15 @@ async function body(req) {
 }
 
 // Documents Alice can read (sent inline to the model).
+/** Today's date + a firm instruction to search for anything recent (models otherwise answer from old training data). */
+function withToday(system, search, tz) {
+  let today;
+  try { today = new Date().toLocaleString('en-US', { timeZone: tz || 'America/New_York', dateStyle: 'full', timeStyle: 'short' }); } catch { today = new Date().toUTCString(); }
+  const lines = [`Today is ${today}.`];
+  if (search) lines.push('For news, sports, scores, prices, weather, people in the news, releases or anything that may have happened or changed recently, ALWAYS use Google Search before answering, and answer from what you find. Never say you cannot access current information or the internet.');
+  return lines.join(' ') + '\n\n' + (system || '');
+}
+
 const AUDIO_TYPES = ['audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp3', 'audio/mpeg', 'audio/ogg'];
 const FILE_TYPES = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const clean = (s, max) => (typeof s === 'string' ? s.slice(0, max) : '');
@@ -132,7 +141,7 @@ export const server = createServer(async (req, res) => {
     }
     const history = Array.isArray(b.history) ? b.history.slice(-24).map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', text: clean(h.text, 4000) })) : [];
     const r = await providerFor(rt.name).respond({
-      model: rt.model, system: clean(b.system, 20000), history, text: clean(b.text, 8000),
+      model: rt.model, system: withToday(clean(b.system, 20000), rt.search, clean(b.tz, 60)), history, text: clean(b.text, 8000),
       imageBase64: typeof b.imageBase64 === 'string' ? b.imageBase64 : undefined, search: rt.search,
       audio,
       file: b.file && typeof b.file.base64 === 'string' && FILE_TYPES.includes(b.file.mime) ? { mime: b.file.mime, base64: b.file.base64, name: clean(b.file.name, 120) || 'document' } : undefined,
