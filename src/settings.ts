@@ -20,6 +20,7 @@ export type Settings = {
   voiceStyle: string; // id from VOICE_STYLES in voice.ts
   voicePitch: number; // -2 (deeper) .. +2 (higher)
   modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
+  liveConversation: boolean; // real-time, interruptible conversation (Gemini Live) instead of one question at a time
 };
 
 /** AI models are chosen on Alice's server (server/src/config.mjs), not on the phone. */
@@ -43,6 +44,7 @@ export const DEFAULTS: Settings = {
   voiceStyle: 'natural',
   voicePitch: 0,
   modeVoices: {},
+  liveConversation: true,
 };
 
 let cache: Settings = DEFAULTS;

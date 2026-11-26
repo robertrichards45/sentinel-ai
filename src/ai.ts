@@ -91,3 +91,10 @@ export async function speechAudio(text: string, voice: string, style?: string): 
   if (!j.audioBase64) throw new AIError('No audio came back.');
   return { audioBase64: j.audioBase64, mime: j.mime ?? 'audio/wav' };
 }
+
+/** Short-lived token + endpoints for a real-time conversation (src/live.ts). */
+export async function liveSession(): Promise<{ token: string; model: string; endpoints: string[] }> {
+  const j = await call('/v1/live', {}, 20000);
+  if (!Array.isArray(j.endpoints) || !j.endpoints.length) throw new AIError("Couldn't start a live conversation.");
+  return { token: j.token, model: j.model, endpoints: j.endpoints };
+}

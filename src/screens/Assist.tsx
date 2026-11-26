@@ -9,6 +9,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
 import { onListenRequest } from '../triggers';
+import { live, LiveState, LiveLine } from '../live';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
@@ -18,11 +19,11 @@ import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
 const HINT: Record<string, string> = {
   general: 'Ask anything. Try "remind me to call the VA at 9 tomorrow".',
   research: 'Ask a question that needs the web. Alice checks sources and says where they disagree.',
-  vision: 'Say your question. A photo is taken when you let go.',
-  reader: 'Point at the page, then hold and say "read this".',
+  vision: 'Tap Take photo (or pick a glasses photo), then ask about it by voice.',
+  reader: 'Tap Take photo of the page, or Read a file. Alice reads it aloud.',
   scene: 'Hold and say "what should I watch out for".',
-  mechanic: 'Describe the problem, then a photo is taken.',
-  electronics: 'Describe the fault, then a photo is taken.',
+  mechanic: 'Take a photo of the problem, then describe it.',
+  electronics: 'Take a photo of the board, then describe the fault.',
   pc: 'Point at the error message and ask what it means.',
   navigator: 'Try "where am I" or "walking directions to…".',
 };
@@ -39,6 +40,20 @@ export default function Assist() {
   const [log, setLog] = useState<Exchange[]>([]);
   const [err, setErr] = useState('');
   const [attached, setAttached] = useState<Attachment | null>(null);
+  const lastPhoto = useRef<string | undefined>(undefined);
+  const [liveState, setLiveState] = useState<LiveState>(live.state);
+  const [liveNote, setLiveNote] = useState('');
+  const [lines, setLines] = useState<LiveLine[]>([]);
+  const liveOn = liveState !== 'off' && liveState !== 'error';
+  const toggleLive = async () => {
+    if (liveOn) { await live.stop(); return; }
+    stopSpeaking(); setErr(''); setLiveNote('');
+    await live.start({
+      state: (st, detail) => { setLiveState(st); if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? ''); },
+      line: (l) => setLines((x) => [l, ...x].slice(0, 60)),
+    });
+  };
+  useEffect(() => () => { live.stop(); }, []);
   const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
   const listeningRef = useRef(false);
   const pressingRef = useRef(false);
@@ -81,7 +96,7 @@ export default function Assist() {
     try { await rec.stop(); } catch {}
   };
   const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
-  useEffect(() => onListenRequest(listenHandsFree));
+  useEffect(() => onListenRequest(() => (s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
 
   const start = async (fromHandsFree = false) => {
     if (!fromHandsFree) { pressedAt.current = Date.now(); handsFreeRef.current = false; }
@@ -107,9 +122,8 @@ export default function Assist() {
     if (vad.current) { clearInterval(vad.current); vad.current = null; }
     listeningRef.current = false; setListening(false);
     await rec.stop();
-    let image: string | undefined;
-    if (mode.wantsImage) image = await snap(false);
-    if (rec.uri) run({ audioUri: rec.uri, imageBase64: image });
+    // Voice never opens the camera by itself; in photo modes the last photo you took is reused.
+    if (rec.uri) run({ audioUri: rec.uri, imageBase64: mode.wantsImage ? lastPhoto.current : undefined });
   };
 
 
@@ -119,7 +133,9 @@ export default function Assist() {
       const p = await ImagePicker.requestCameraPermissionsAsync();
       return p.granted ? ImagePicker.launchCameraAsync(opts) : ({ canceled: true } as const);
     })();
-    return !r.canceled && r.assets?.[0]?.base64 ? r.assets[0].base64 : undefined;
+    const b64 = !r.canceled && r.assets?.[0]?.base64 ? r.assets[0].base64 : undefined;
+    if (b64) lastPhoto.current = b64; // follow-up voice questions are about this photo
+    return b64;
   };
 
   /** Pick a PDF, text file or picture; Alice reads it aloud and keeps it for follow-up questions. */
@@ -137,8 +153,10 @@ export default function Assist() {
     run({ file });
   };
 
-  const state: OrbState = listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
-  const status = listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
+  const liveOrb: Record<LiveState, OrbState> = { off: 'idle', error: 'idle', connecting: 'thinking', listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
+  const liveStatus: Record<LiveState, string> = { off: 'Tap Alice to start talking', error: 'Tap Alice to try again', connecting: liveNote || 'Connecting…', listening: 'Listening… just talk', thinking: 'Thinking…', speaking: 'Speaking · just talk to interrupt' };
+  const state: OrbState = s.liveConversation ? liveOrb[liveState] : listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
+  const status = s.liveConversation ? liveStatus[liveState] : listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
   const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
 
   return (
@@ -161,12 +179,14 @@ export default function Assist() {
       </ScrollView>
 
       <View style={{ alignItems: 'center', gap: 6 }}>
-        <Pressable onPressIn={() => (listeningRef.current && handsFreeRef.current ? finish() : start())} onPressOut={() => stop()} onPress={() => speaking && stopSpeaking()}
-          accessibilityRole="button" accessibilityLabel={listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
+        <Pressable onPressIn={s.liveConversation ? undefined : () => (listeningRef.current && handsFreeRef.current ? finish() : start())}
+          onPressOut={s.liveConversation ? undefined : () => stop()}
+          onPress={s.liveConversation ? toggleLive : () => speaking && stopSpeaking()}
+          accessibilityRole="button" accessibilityLabel={s.liveConversation ? (liveOn ? 'End conversation with Alice' : 'Start conversation with Alice') : listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
           <Orb size={250} state={state} />
         </Pressable>
         <View style={{ height: 44, justifyContent: 'center' }}>
-          {listening ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
+          {(s.liveConversation ? liveState === 'listening' : listening) ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
         </View>
         <Text style={[S.dim, { textAlign: 'center' }]}>{listening ? `Microphone: ${mic}` : hint}</Text>
       </View>
@@ -177,18 +197,18 @@ export default function Assist() {
       </View>
       {attached ? <Text style={[S.dim, { textAlign: 'center' }]} numberOfLines={1}>Ask anything about "{attached.name}". Tap Done to stop.</Text> : null}
 
-      {mode.wantsImage ? (
+      {mode.wantsImage || liveOn ? (
         <View style={S.row}>
-          <Btn style={{ flex: 1 }} icon="camera-outline" title="Take photo" onPress={async () => { const i = await snap(false); if (i) run({ imageBase64: i }); }} />
-          <Btn style={{ flex: 1 }} kind="ghost" icon="images-outline" title="Glasses photo" onPress={async () => { const i = await snap(true); if (i) run({ imageBase64: i }); }} />
+          <Btn style={{ flex: 1 }} icon="camera-outline" title="Take photo" onPress={async () => { const i = await snap(false); if (i) (liveOn ? live.sendImage(i) : run({ imageBase64: i })); }} />
+          <Btn style={{ flex: 1 }} kind="ghost" icon="images-outline" title="Glasses photo" onPress={async () => { const i = await snap(true); if (i) (liveOn ? live.sendImage(i) : run({ imageBase64: i })); }} />
         </View>
       ) : null}
 
       <Glass radius={999} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 6 }}>
         <TextInput style={{ flex: 1, fontFamily: F.regular, fontSize: 16, color: C.ink, paddingVertical: 8 }} value={typed} onChangeText={setTyped}
           placeholder="Or type to Alice" placeholderTextColor={C.faint} returnKeyType="send" accessibilityLabel="Type a question" keyboardAppearance="dark"
-          onSubmitEditing={() => { if (typed) { run({ text: typed }); setTyped(''); } }} />
-        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!typed || busy} onPress={() => { run({ text: typed }); setTyped(''); }}
+          onSubmitEditing={() => { if (typed) { liveOn ? live.sendText(typed) : run({ text: typed }); setTyped(''); } }} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!typed || busy} onPress={() => { liveOn ? live.sendText(typed) : run({ text: typed }); setTyped(''); }}
           style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: typed && !busy ? C.violet : 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
         </Pressable>
@@ -200,6 +220,14 @@ export default function Assist() {
           <Text style={S.dim} selectable>{err}</Text>
         </Card>
       ) : null}
+
+      {s.liveConversation ? lines.map((l) => (
+        l.who === 'you'
+          ? <Text key={l.t + l.who} style={{ fontFamily: F.light, fontSize: 20, lineHeight: 27, color: C.sub, letterSpacing: -0.2 }} selectable>{l.text}</Text>
+          : l.who === 'done'
+            ? <View key={l.t + l.who} style={S.row}><Ionicons name="checkmark-circle" size={16} color={C.mint} /><Text style={[S.dim, { color: C.mint, flex: 1 }]}>{l.text}</Text></View>
+            : <Glass key={l.t + l.who} style={{ padding: 16 }}><Text style={S.body} selectable>{l.text}</Text></Glass>
+      )) : null}
 
       {log.map((e) => (
         <View key={e.t} style={{ gap: 10 }}>

@@ -7,6 +7,7 @@ import { addFact, forget, addTurn, memoryPrompt, EMPTY, MAX_HISTORY } from '../s
 import { BUILT_IN_MODES, importModes } from '../src/modes';
 import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
 import { splitForSpeech } from '../src/speechCore';
+import { floatToPcm16, resampleLinear } from '../src/liveCore';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
 let fails = 0;
@@ -101,6 +102,16 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('long answer splits after first sentence', f.endsWith('2026.') && r.startsWith('They beat') && (f + ' ' + r).replace(/\s+/g, ' ').trim() === long.replace(/\s+/g, ' ').trim(), [f, r.slice(0, 30)]);
   const [g, h] = splitForSpeech('x'.repeat(300));
   check('no sentence end: still splits safely', g.length > 0 && g.length + h.length === 300, [g.length, h.length]);
+}
+
+// ---- live conversation audio ----
+{
+  const p = floatToPcm16(new Float32Array([0, 1, -1, 2, -2, 0.5]));
+  check('float -> PCM16 with clipping', p[0] === 0 && p[1] === 32767 && p[2] === -32768 && p[3] === 32767 && p[4] === -32768 && p[5] === 16384, Array.from(p));
+  const r = resampleLinear(new Float32Array(480).fill(0.25), 48000, 16000);
+  check('48 kHz -> 16 kHz keeps length ratio and level', r.length === 160 && Math.abs(r[80] - 0.25) < 1e-6, r.length);
+  const same = new Float32Array([1, 2]);
+  check('same rate is a no-op', resampleLinear(same, 16000, 16000) === same, 'copied');
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

@@ -103,6 +103,10 @@ export default function Settings() {
         )) : null}
       </Card>
 
+      <Card title="Conversation">
+        <Toggle label="Live conversation" hint="Talk back and forth like a phone call, and interrupt Alice any time. Turn off to ask one question at a time." value={s.liveConversation} onChange={(v) => updateSettings({ liveConversation: v })} />
+      </Card>
+
       <Card title="Start Alice hands-free">
         <Text style={S.dim}>Make a Siri shortcut: open Shortcuts, tap +, add "Open URLs" with alice://talk, and name it "Alice". Then say "Hey Siri, Alice" (through the glasses if they're your headphones). Alice opens and listens until you stop talking.</Text>
         <Text style={S.dim}>You can also put that shortcut on the Action Button or Back Tap. The glasses' own button needs one Bluetooth capture first (see the guide).</Text>
@@ -150,7 +154,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.5.1. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.6.0. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }
