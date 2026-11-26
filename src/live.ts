@@ -16,7 +16,7 @@ import { runAction } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
-import { floatToPcm16, resampleLinear } from './liveCore';
+import { floatToPcm16, resampleLinear, frameText } from './liveCore';
 import { VOICE_STYLES } from './voice';
 
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
@@ -120,14 +120,17 @@ class LiveSession {
 
   private connect(i: number) {
     const url = this.endpoints[i];
-    if (!url) { this.set('error', "Couldn't open a live conversation."); this.teardown(); return; }
+    if (!url) { this.set('error', "Couldn't reach Alice's live voice. Check your internet, or turn off Live conversation in Settings to ask one question at a time."); this.teardown(); return; }
     let ready = false;
     const ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer'; // Google sends JSON in binary frames
     this.ws = ws;
+    const guard = setTimeout(() => { if (!ready && this.ws === ws) { try { ws.close(); } catch {} } }, 12000);
     ws.onopen = () => ws.send(JSON.stringify(this.setupMessage()));
-    ws.onmessage = (e) => this.onMessage(typeof e.data === 'string' ? e.data : String(e.data), () => { ready = true; });
+    ws.onmessage = (e) => this.onMessage(frameText(e.data), () => { ready = true; clearTimeout(guard); });
     ws.onerror = () => {};
     ws.onclose = () => {
+      clearTimeout(guard);
       if (this.ws !== ws || this.stopping) return;
       if (!ready) return this.connect(i + 1); // try the other API version
       if (this.handle) { this.set('connecting', 'Reconnecting…'); this.connect(i); } // resume after the ~10 min connection limit

@@ -7,7 +7,7 @@ import { addFact, forget, addTurn, memoryPrompt, EMPTY, MAX_HISTORY } from '../s
 import { BUILT_IN_MODES, importModes } from '../src/modes';
 import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
 import { splitForSpeech } from '../src/speechCore';
-import { floatToPcm16, resampleLinear } from '../src/liveCore';
+import { floatToPcm16, resampleLinear, frameText } from '../src/liveCore';
 import { describeWeather } from '../src/weatherCore';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
@@ -123,6 +123,16 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('weather sentence', t.startsWith("In New York, New York it's 41°F and overcast, feels like 35, windy at 22 mph.") && t.includes('70% chance of rain') && t.includes('Tomorrow: clear, 30 to 50°F.'), t);
   check('weather action validated', JSON.stringify(validateAction({ type: 'weather', place: 'Paris', days: 9 }, [])) === '{"type":"weather","place":"Paris"}', validateAction({ type: 'weather', place: 'Paris', days: 9 }, []));
   check('weather missing data handled', describeWeather({}, 'x', 'celsius').startsWith("I couldn't"), 'threw');
+}
+
+// ---- live: binary WebSocket frames (the 0.6.0/0.6.1 "stuck connecting" bug) ----
+{
+  const json = '{"setupComplete":{}}';
+  const ab = new TextEncoder().encode(json).buffer;
+  check('frame: text', frameText(json) === json, frameText(json));
+  check('frame: ArrayBuffer', frameText(ab) === json, frameText(ab));
+  check('frame: Uint8Array view', frameText(new Uint8Array(ab)) === json, 'x');
+  check('frame: unknown -> empty', frameText({}) === '', 'x');
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

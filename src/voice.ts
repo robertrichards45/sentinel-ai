@@ -113,10 +113,31 @@ function styleFor(styleId: string, rate: number, pitch: number): string {
   return `${base}, ${pace}${tone}`;
 }
 
-function speakIphone(text: string, language: string, rate: number, pitch: number, gen: number): Promise<void> {
+/**
+ * Offline fallback: the best female iPhone voice installed for the language (Premium/Enhanced
+ * Siri-quality voices sound far less robotic than the default compact voice).
+ */
+const bestVoiceCache = new Map<string, string | undefined>();
+const PREFERRED = /\b(ava|zoe|samantha|allison|susan|serena|karen|moira|tessa|kate|nicky|evan)\b/i;
+async function bestIphoneVoice(language: string): Promise<string | undefined> {
+  if (bestVoiceCache.has(language)) return bestVoiceCache.get(language);
+  let id: string | undefined;
+  try {
+    const all = await Speech.getAvailableVoicesAsync();
+    const lang = language.toLowerCase(), base = lang.split('-')[0];
+    const pool = all.filter((v) => v.language?.toLowerCase() === lang).concat(all.filter((v) => v.language?.toLowerCase().startsWith(base + '-')));
+    const score = (v: Speech.Voice) => (v.quality === Speech.VoiceQuality.Enhanced ? 10 : 0) + (/premium/i.test(v.identifier) ? 5 : 0) + (PREFERRED.test(v.name) ? 3 : 0) + (v.language?.toLowerCase() === lang ? 1 : 0);
+    id = pool.sort((a, b) => score(b) - score(a))[0]?.identifier;
+  } catch {}
+  bestVoiceCache.set(language, id);
+  return id;
+}
+
+async function speakIphone(text: string, language: string, rate: number, pitch: number, gen: number): Promise<void> {
+  const voice = await bestIphoneVoice(language);
   return new Promise((resolve) => {
     if (gen !== generation) return resolve();
-    Speech.speak(text, { language, rate, pitch: 1 + pitch * 0.12, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
+    Speech.speak(text, { language, voice, rate, pitch: 1 + pitch * 0.12, onDone: () => resolve(), onStopped: () => resolve(), onError: () => resolve() });
   });
 }
 
@@ -152,8 +173,9 @@ export function speak(text: string, language?: string, modeId?: string): Promise
       const style = styleFor(s.voiceStyle, s.speechRate, s.voicePitch);
       const [first, rest] = splitForSpeech(text.slice(0, 3000));
       // Voice both parts at once; play the first as soon as it's ready.
-      const firstP = speechAudio(first, voice, style);
-      const restP = rest ? speechAudio(rest, voice, style).catch(() => null) : Promise.resolve(null);
+      const tts = (t: string) => speechAudio(t, voice, style).catch(() => speechAudio(t, voice, style)); // one retry
+      const firstP = tts(first);
+      const restP = rest ? tts(rest).catch(() => null) : Promise.resolve(null);
       try {
         const a = await firstP;
         if (gen !== generation) return;

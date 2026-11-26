@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 /** Pure audio helpers for the live conversation (unit-tested on the PC). */
 
 /** Float samples (-1..1) to 16-bit little-endian PCM, clipped. */
@@ -22,4 +23,12 @@ export function resampleLinear(f: Float32Array, from: number, to: number): Float
     out[i] = a + (b - a) * w;
   }
   return out;
+}
+
+/** WebSocket frames arrive as text or binary (ArrayBuffer / typed array) depending on the platform. */
+export function frameText(d: unknown): string {
+  if (typeof d === 'string') return d;
+  if (d instanceof ArrayBuffer) return Buffer.from(new Uint8Array(d)).toString('utf8');
+  if (ArrayBuffer.isView(d)) return Buffer.from(new Uint8Array(d.buffer as ArrayBuffer, d.byteOffset, d.byteLength)).toString('utf8');
+  return '';
 }
