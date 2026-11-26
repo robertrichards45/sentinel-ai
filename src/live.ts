@@ -74,7 +74,11 @@ class LiveSession {
       const perm = await AudioManager.requestRecordingPermissions();
       if (perm !== 'Granted') throw new Error('Microphone permission is needed.');
       // Voice-chat session: Bluetooth glasses/headset mic + speaker, echo cancellation, loudspeaker otherwise.
-      AudioManager.setSystemOptions({ ios: { category: 'playAndRecord', mode: 'voiceChat', options: ['allowBluetoothHFP', 'allowBluetoothA2DP', 'defaultToSpeaker', 'duckOthers'] } });
+      // Keep Bluetooth headphones (the glasses) in high-quality music mode (A2DP): never ask iOS for the
+      // headset's call mic (HFP), which would drop Alice to phone-call quality. The mic is the phone's,
+      // and the glasses' own mic reaches Alice separately over their data channel. Mode 'default', not
+      // 'voiceChat' (voiceChat turns call mode back on); echo cancellation comes from the recorder's voice processing.
+      AudioManager.setSystemOptions({ ios: { category: 'playAndRecord', mode: 'default', options: ['allowBluetoothA2DP', 'defaultToSpeaker', 'duckOthers'] } });
       await AudioManager.setAudioSessionActivity(true);
       const t = await liveSession();
       this.endpoints = t.endpoints; this.model = t.model;
