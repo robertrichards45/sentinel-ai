@@ -14,6 +14,7 @@ import { onGlassesVoice } from '../glassesVoice';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
 import { setPhoneMic } from '../micState';
+import { goToSleep, wakeUp } from '../quiet';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
 import { Orb, VoiceBars, OrbState } from '../Orb';
 import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
@@ -58,7 +59,8 @@ export default function Assist() {
     error: (m) => setErr(m),
   }), []);
   const toggleLive = async () => {
-    if (liveOn) { await live.stop(); return; }
+    if (liveOn) { goToSleep(); await live.stop(); return; }
+    wakeUp();
     stopSpeaking(); setErr(''); setLiveNote('');
     await live.start();
   };

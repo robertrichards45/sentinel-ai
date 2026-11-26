@@ -18,6 +18,7 @@ import { live, liveReady } from './live';
 import { getSettings } from './settings';
 import { onSpeaking } from './voice';
 import { setSessionCheck } from './micState';
+import { isAsleep, wakeUp, whenSleeping } from './quiet';
 
 type Listener = { state?: (s: 'listening' | 'thinking' | 'idle') => void; exchange?: (e: Exchange) => void; error?: (m: string) => void };
 const listeners = new Set<Listener>();
@@ -69,7 +70,7 @@ async function followUp() {
   // glasses' mic doesn't pick up her own voice.
   while (speaking || live.state === 'speaking' || live.state === 'thinking') await new Promise((r) => setTimeout(r, 200));
   await new Promise((r) => setTimeout(r, 500));
-  if (!session) return;
+  if (!session || isAsleep()) { endSession(); return; }
   await cmd('micOn');
   startTurn();
   followUpTimer = setTimeout(() => { if (recording && spoke === 0) { recording = false; emit('state', 'idle'); endSession(); } }, FOLLOW_UP_MS);
@@ -92,6 +93,7 @@ async function finish() {
     // Fast path: answer through the live conversation (streams Alice's voice as it is generated, ~2-3 s)
     // instead of the one-question path (whole answer, then a separate voice step, 5-10 s).
     const useLive = getSettings().liveConversation;
+    if (isAsleep()) { emit('state', 'idle'); endSession(); return; }
     if (useLive && (live.state === 'off' || live.state === 'error')) { liveByGlasses = true; live.start({ mic: false }); }
     if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }
     if (useLive || (live.state !== 'off' && live.state !== 'error')) {
@@ -112,7 +114,7 @@ async function finish() {
   } finally {
     processing = false; emit('state', 'idle');
   }
-  if (session) setTimeout(followUp, 300);
+  if (session && !isAsleep()) setTimeout(followUp, 300); else if (isAsleep()) endSession();
 }
 
 /** Wait for the live reply to start and finish (or give up after 30 s). */
@@ -127,6 +129,7 @@ async function waitLiveReply(): Promise<number | null> {
 glasses.on((e: any) => {
   if (e.kind === 'busy' && e.on && drive() && !session && !recording && !processing) {
     // Button pressed: answer it the way the official app does, then switch the glasses mic on.
+    wakeUp(); // pressing the button is you asking for Alice
     session = true; heard = false;
     cmd('ackButton').then(() => setTimeout(() => { if (session) cmd('micOn'); }, 300));
   } else if (e.kind === 'busy' && !e.on && session && !recording && !processing && !heard) {
@@ -136,6 +139,7 @@ glasses.on((e: any) => {
     else finish();
   } else if (e.kind === 'voiceAudio') {
     if (processing) return; // still answering the last turn
+    if (isAsleep() && !session) return; // you told her to stop listening
     if (!recording) startTurn(); // start record missed
     frames.push(...e.frames);
     for (const f of e.frames) {
@@ -149,3 +153,11 @@ glasses.on((e: any) => {
 });
 
 setSessionCheck(glassesSessionActive);
+
+// "Stop listening": close the glasses conversation right away and stop the live session it opened.
+whenSleeping(() => {
+  recording = false; frames = [];
+  endSession();
+  if (liveByGlasses) { liveByGlasses = false; live.stop(); }
+  emit('state', 'idle');
+});

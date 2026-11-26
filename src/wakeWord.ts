@@ -13,6 +13,7 @@ import { live } from './live';
 import { glassesVoiceActive } from './glassesVoice';
 import { wake } from './triggers';
 import { note } from './diary';
+import { wakeUp } from './quiet';
 
 const WAKE = /\b(hey|hi|hay|okay|ok)[\s,.!]*(alice|alyce|alis|allis|elise|alys)\b/i;
 export const heardWakeWord = (t: string) => WAKE.test(t);
@@ -56,6 +57,7 @@ ExpoSpeechRecognitionModule.addListener('result', (ev: any) => {
   if (!heardWakeWord(text) || Date.now() - lastWake < 4000) return;
   lastWake = Date.now();
   note('wake-word');
+  wakeUp();
   stop();
   setTimeout(wake, 500); // let iOS release the microphone before Alice opens it
 });

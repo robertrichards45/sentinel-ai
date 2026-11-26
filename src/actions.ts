@@ -1,3 +1,4 @@
+import { goToSleep } from './quiet';
 import { note, flushDiary } from './diary';
 import { Alert, Linking } from 'react-native';
 import * as Calendar from 'expo-calendar';
@@ -87,6 +88,10 @@ export async function runAction(a: Action): Promise<string> {
       const [addr] = await Location.reverseGeocodeAsync(pos.coords);
       if (!addr) return `You are at latitude ${pos.coords.latitude.toFixed(4)}, longitude ${pos.coords.longitude.toFixed(4)}.`;
       return `You're near ${[addr.name, addr.street, addr.city].filter(Boolean).join(', ')}.`;
+    }
+    case 'stop_listening': {
+      setTimeout(goToSleep, 1500); // after she says goodbye
+      return 'Okay, I\'ll stop listening.';
     }
     case 'report_problem': {
       note('user-report', { text: a.text });
