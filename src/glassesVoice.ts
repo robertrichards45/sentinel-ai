@@ -31,6 +31,7 @@ let recording = false;
 let frames: Uint8Array[] = [];
 let busy = false;
 let session = false; // Alice is driving the glasses' mic (conversation mode)
+let heard = false; // this session produced at least one turn
 let spoke = 0; // ms of speech in this turn
 let quiet = 0; // ms of trailing silence
 let followUpTimer: ReturnType<typeof setTimeout> | null = null;
@@ -66,13 +67,15 @@ async function followUp() {
 async function finish() {
   if (!recording) return;
   recording = false;
+  busy = true; // claim the turn before any await, so the glasses' own "mic off" signal doesn't end the session
   if (followUpTimer) { clearTimeout(followUpTimer); followUpTimer = null; }
   if (session) await cmd('micOff');
+  busy = false;
   const f = frames; frames = [];
   const said = f.filter((x) => !isSilent(x)).length;
   if (said < 5 || getSettings().privacyMode) { emit('state', 'idle'); endSession(); return; } // nothing said
   if (busy) return; // one turn at a time
-  busy = true; emit('state', 'thinking');
+  busy = true; heard = true; emit('state', 'thinking');
   const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
   try {
     if (live.state !== 'off' && live.state !== 'error') {
@@ -94,10 +97,10 @@ async function finish() {
 glasses.on((e: any) => {
   if (e.kind === 'busy' && e.on && drive() && !session && !recording && !busy) {
     // Button pressed: answer it the way the official app does, then switch the glasses mic on.
-    session = true;
+    session = true; heard = false;
     cmd('ackButton').then(() => setTimeout(() => { if (session) cmd('micOn'); }, 300));
-  } else if (e.kind === 'busy' && !e.on && session && !recording && !busy) {
-    endSession(); // glasses closed the session (or it was only a photo)
+  } else if (e.kind === 'busy' && !e.on && session && !recording && !busy && !heard) {
+    endSession(); // glasses closed the session before anything was said (or it was only a photo)
   } else if (e.kind === 'voice') {
     if (e.on) { if (!recording) startTurn(); }
     else finish();
