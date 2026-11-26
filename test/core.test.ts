@@ -9,6 +9,9 @@ import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
 import { splitForSpeech } from '../src/speechCore';
 import { floatToPcm16, resampleLinear, frameText } from '../src/liveCore';
 import { describeWeather } from '../src/weatherCore';
+import { parseChannelA, parseChannelB } from '../src/protocol';
+import { opusToOgg } from '../src/oggOpus';
+import { createHash } from 'node:crypto';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
 let fails = 0;
@@ -133,6 +136,29 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('frame: ArrayBuffer', frameText(ab) === json, frameText(ab));
   check('frame: Uint8Array view', frameText(new Uint8Array(ab)) === json, 'x');
   check('frame: unknown -> empty', frameText({}) === '', 'x');
+}
+
+// ---- glasses microphone over Bluetooth (verified 2026-11-26) ----
+{
+  const LOG = process.env.GLASSES_VOICE_LOG ?? (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/alice-ble-voice-2026-11-26.jsonl';
+  check('voice start/stop records', JSON.stringify(parseChannelA(Uint8Array.from([0x54, 0x12, 4]))) === '{"kind":"voice","on":true,"confidence":"verified"}' && (parseChannelA(Uint8Array.from([0x54, 0x12, 0])) as any).on === false, 'x');
+  check('end-of-recording record', (parseChannelB(Uint8Array.from([2, 0, 0xcc, 0xdd, 0x19, 0, 0, 0])) as any).packets === 25, 'x');
+  check('busy flag still parsed', (parseChannelB(Uint8Array.from([1, 0, 1, 0, 1, 0, 1, 0, 1])) as any).on === true, 'x');
+  if (existsSync(LOG)) {
+    const sessions: Uint8Array[][] = []; let cur: Uint8Array[] = []; let starts = 0;
+    for (const line of readFileSync(LOG, 'utf8').split('\n').filter(Boolean)) {
+      const r = JSON.parse(line); const b = Uint8Array.from(Buffer.from(r.hex, 'hex'));
+      const e: any = r.ch === 'A' ? parseChannelA(b) : parseChannelB(b);
+      if (e.kind === 'voice' && e.on) starts++;
+      if (e.kind === 'voiceAudio') cur.push(...e.frames);
+      if (e.kind === 'voiceEnd') { sessions.push(cur); cur = []; }
+    }
+    check('3 recordings decoded from the real log', starts === 3 && JSON.stringify(sessions.map((x) => x.length)) === '[370,84,366]', sessions.map((x) => x.length));
+    check('all frames are Opus SILK-WB 40 ms (TOC 0x50)', sessions.flat().every((f) => f[0] === 0x50), 'other TOC');
+    const ogg = opusToOgg(sessions[1]);
+    const h = createHash('sha256').update(ogg).digest('hex');
+    check('Ogg file byte-identical to the one Gemini transcribed', h === '4d2e78283210e5ad7fc28f72905428da2b8e87ae8ea083b961cc48b06cf4eda6', h);
+  } else console.log('SKIP  real glasses-voice log not on this machine');
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

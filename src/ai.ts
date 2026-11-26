@@ -57,6 +57,12 @@ export async function audioOf(fileUri: string): Promise<{ mime: string; base64: 
   return { mime: /\.wav$/i.test(fileUri) ? 'audio/wav' : 'audio/m4a', base64: await new File(fileUri).base64() };
 }
 
+/** Speech-to-text for audio already in memory (e.g. the glasses' microphone as Ogg Opus). */
+export async function transcribeAudio(audio: { mime: string; base64: string }): Promise<string> {
+  const j = await call('/v1/transcribe', { audioBase64: audio.base64, mime: audio.mime }, 45000);
+  return String(j.text ?? '').trim();
+}
+
 /** Speech-to-text for a recorded file (m4a or wav). */
 export async function transcribe(fileUri: string): Promise<string> {
   const audioBase64 = await new File(fileUri).base64();

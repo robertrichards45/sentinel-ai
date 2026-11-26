@@ -37,6 +37,9 @@ export type GlassesEvent =
   | { kind: 'status'; fields: number[]; confidence: 'unknown' }
   | { kind: 'busy'; on: boolean; raw: string; confidence: 'likely' } // channel B flag
   | { kind: 'mediaEvent'; code: number; raw: string; confidence: 'unknown' } // e.g. 54 12
+  | { kind: 'voice'; on: boolean; confidence: 'verified' } // 54 12 04 = glasses started listening, 54 12 00 = stopped
+  | { kind: 'voiceAudio'; seq: number; frames: Uint8Array[]; confidence: 'verified' } // Opus frames from the glasses mic
+  | { kind: 'voiceEnd'; packets: number; confidence: 'verified' }
   | { kind: 'raw'; channel: string; hex: string; confidence: 'unknown' };
 
 export const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
@@ -53,6 +56,9 @@ export function parseChannelA(b: Uint8Array): GlassesEvent {
     case 0x54:
       // 54 06 NN: NN rose 2->4->5->6 exactly as files were written (checked vs USB drive).
       if (b[1] === 0x06) return { kind: 'mediaCount', count: b[2], confidence: 'verified' };
+      // 54 12 04 / 54 12 00 bracket every glasses-mic recording (verified 2026-11-26: 3 recordings,
+      // transcribed as "How you doing, man?", "Hey sweetie, are you awake?", "How are you today?").
+      if (b[1] === 0x12 && (b[2] === 0x04 || b[2] === 0x00)) return { kind: 'voice', on: b[2] === 0x04, confidence: 'verified' };
       return { kind: 'mediaEvent', code: b[1], raw: hex(b), confidence: 'unknown' };
     case 0x03:
     case 0x13:
@@ -70,9 +76,25 @@ export function parseChannelA(b: Uint8Array): GlassesEvent {
   }
 }
 
-/** Channel B (33F6) — 9 bytes `01 00 01 00 01 00 01 00 XX`; XX toggles 1/0. */
+/**
+ * Channel B (33F6)
+ *  - 9 bytes `01 00 01 00 01 00 01 00 XX`: busy flag (camera OR microphone in use).
+ *  - Mic audio (verified): `02 00 00 00 | seq u16 LE | len u16 LE | count u8 | count x ([len u8][Opus frame])`.
+ *    Every frame starts with TOC 0x50 = Opus SILK wideband, 16 kHz, mono, 40 ms.
+ *  - End of recording: `02 00 CC DD | packets u32 LE`.
+ */
 export function parseChannelB(b: Uint8Array): GlassesEvent {
   if (b.length === 9 && b[0] === 0x01) return { kind: 'busy', on: b[8] === 1, raw: hex(b), confidence: 'likely' };
+  if (b.length >= 8 && b[0] === 0x02 && b[1] === 0x00 && b[2] === 0xcc && b[3] === 0xdd) return { kind: 'voiceEnd', packets: u32(b, 4), confidence: 'verified' };
+  if (b.length >= 9 && b[0] === 0x02 && b[1] === 0x00 && b[2] === 0x00 && b[3] === 0x00) {
+    const len = u16(b, 6), body = b.subarray(8);
+    if (len === body.length) {
+      const n = body[0], frames: Uint8Array[] = [];
+      let i = 1;
+      for (let k = 0; k < n && i < body.length; k++) { const L = body[i]; frames.push(body.slice(i + 1, i + 1 + L)); i += 1 + L; }
+      if (i === body.length) return { kind: 'voiceAudio', seq: u16(b, 4), frames, confidence: 'verified' };
+    }
+  }
   return { kind: 'raw', channel: 'B', hex: hex(b), confidence: 'unknown' };
 }
 

@@ -10,6 +10,7 @@ import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
 import { onListenRequest } from '../triggers';
 import { live, LiveState, LiveLine } from '../live';
+import { onGlassesVoice } from '../glassesVoice';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
 import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
@@ -48,6 +49,12 @@ export default function Assist() {
   useEffect(() => live.subscribe({
     state: (st, detail) => { setLiveState(st); if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? ''); },
     line: () => setLines(live.lines),
+  }), []);
+  const [glassesNote, setGlassesNote] = useState('');
+  useEffect(() => onGlassesVoice({
+    state: (st) => setGlassesNote(st === 'listening' ? 'Listening through your glasses…' : st === 'thinking' ? 'Thinking…' : ''),
+    exchange: (ex) => setLog((l) => [ex, ...l].slice(0, 30)),
+    error: (m) => setErr(m),
   }), []);
   const toggleLive = async () => {
     if (liveOn) { await live.stop(); return; }
@@ -188,7 +195,7 @@ export default function Assist() {
         <View style={{ height: 44, justifyContent: 'center' }}>
           {(s.liveConversation ? liveState === 'listening' : listening) ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
         </View>
-        <Text style={[S.dim, { textAlign: 'center' }]}>{listening ? `Microphone: ${mic}` : hint}</Text>
+        <Text style={[S.dim, { textAlign: 'center' }]}>{glassesNote || (s.liveConversation && liveState === 'listening' && liveNote ? liveNote : listening ? `Microphone: ${mic}` : hint)}</Text>
       </View>
 
       <View style={S.row}>

@@ -1,4 +1,4 @@
-import { respond, transcribe, audioOf, Source, Attachment } from './ai';
+import { respond, transcribe, transcribeAudio, audioOf, Source, Attachment } from './ai';
 import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
 import { runAction } from './actions';
 import { memory } from './memory';
@@ -23,13 +23,14 @@ export function offlineAnswer(text: string): string | null {
 }
 
 /** One full turn: optional speech file → text → AI (+image) → actions → spoken reply. */
-export async function ask(opts: { text?: string; audioUri?: string; imageBase64?: string; file?: Attachment; modeId?: string }): Promise<Exchange> {
+export async function ask(opts: { text?: string; audioUri?: string; audioData?: { mime: string; base64: string }; imageBase64?: string; file?: Attachment; modeId?: string }): Promise<Exchange> {
   const s = getSettings();
   const mode = allModes().find((m) => m.id === (opts.modeId ?? s.activeMode)) ?? allModes()[0];
   let you = opts.text?.trim() ?? '';
   // Translator needs the words first; every other mode sends the recording straight to the AI (faster).
-  const audio = opts.audioUri && mode.id !== 'translator' ? await audioOf(opts.audioUri) : undefined;
-  if (opts.audioUri && !audio) you = await transcribe(opts.audioUri);
+  const raw = opts.audioData ?? (opts.audioUri ? await audioOf(opts.audioUri) : undefined);
+  const audio = raw && mode.id !== 'translator' ? raw : undefined;
+  if (raw && !audio) you = opts.audioData ? await transcribeAudio(raw) : await transcribe(opts.audioUri!);
   if (!you && !audio && !opts.imageBase64 && !opts.file) return { you: '', alice: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
 
   const offline = !opts.imageBase64 && !opts.file && mode.id !== 'translator' ? offlineAnswer(you) : null;

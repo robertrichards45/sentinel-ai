@@ -52,6 +52,8 @@ class LiveSession {
   private youBuf = '';
   private aliceBuf = '';
   private stopping = false;
+  private t0 = 0;
+  connectMs = 0;
   private subs = new Set<Sub>();
   private ev = { state: (st: LiveState, d?: string) => this.subs.forEach((x) => x.state?.(st, d)), line: (l: LiveLine) => { this.lines = [l, ...this.lines].slice(0, 60); this.subs.forEach((x) => x.line?.(l)); } };
   state: LiveState = 'off';
@@ -67,6 +69,7 @@ class LiveSession {
     if (this.state !== 'off' && this.state !== 'error') return;
     this.stopping = false; this.handle = undefined;
     this.set('connecting');
+    this.t0 = Date.now();
     try {
       const perm = await AudioManager.requestRecordingPermissions();
       if (perm !== 'Granted') throw new Error('Microphone permission is needed.');
@@ -102,6 +105,7 @@ class LiveSession {
     const prompt = [
       mode.prompt,
       tone && tone.id !== 'natural' ? `Your speaking voice: ${tone.style}.` : '',
+      mode.id === 'translator' ? '' : 'Always speak English unless the user clearly speaks to you in another language or asks you to translate.',
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
       mode.id === 'translator' ? `Translate everything the user says into ${s.translateTo} and speak only the translation.` : '',
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
@@ -109,7 +113,7 @@ class LiveSession {
     ].filter(Boolean).join('\n\n');
     return { setup: {
       model: `models/${this.model}`,
-      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { languageCode: mode.id === 'translator' ? undefined : (s.voiceLanguage || 'en-US'), voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
       systemInstruction: { parts: [{ text: prompt }] },
       tools: [{ googleSearch: {} }, { functionDeclarations: TOOLS }],
       inputAudioTranscription: {}, outputAudioTranscription: {},
@@ -158,7 +162,7 @@ class LiveSession {
     let m: any; try { m = JSON.parse(raw); } catch { return; }
     if (m.setupComplete) {
       markReady();
-      try { await this.startMic(); this.set('listening'); }
+      try { await this.startMic(); this.connectMs = Date.now() - this.t0; this.set('listening', `Connected in ${(this.connectMs / 1000).toFixed(1)} s`); }
       catch (e: any) { this.set('error', String(e?.message ?? e)); this.stop(); }
       return;
     }

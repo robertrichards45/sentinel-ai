@@ -30,9 +30,11 @@ export const onGlasses = (fn: (g: GlassesState) => void) => { listeners.add(fn);
 export const onGlassesButton = (fn: () => void) => { buttonListeners.add(fn); return () => buttonListeners.delete(fn); };
 export const markImported = () => { importedCount = s.mediaCount; set({ newMediaSinceImport: 0 }); };
 
+let voiceSeen = false;
 glasses.on((e: any) => {
   const now = Date.now();
   switch (e.kind) {
+    case 'voice': if (e.on) voiceSeen = true; break;
     case 'link': set({ link: e.state, linkDetail: e.detail }); break;
     case 'address': set({ mac: e.mac, ssid: ssidFromMac(e.mac) }); break;
     case 'mediaCount':
@@ -42,7 +44,7 @@ glasses.on((e: any) => {
     case 'heartbeat': {
       set({ heartbeat: e.value, lastPacket: now });
       const lim = getSettings().lowBatteryAlert;
-      if (e.value <= lim && !lowWarned) { lowWarned = true; Speech.speak(`Glasses battery may be low, ${e.value} percent.`); }
+      if (e.value <= lim && !lowWarned) { lowWarned = true; Speech.speak(`Glasses battery may be low, ${e.value} percent.`, { language: getSettings().voiceLanguage }); }
       if (e.value > lim + 5) lowWarned = false;
       break;
     }
@@ -50,8 +52,12 @@ glasses.on((e: any) => {
     case 'busy': {
       const rising = e.on && !s.busy;
       set({ busy: e.on, busySince: e.on ? now : undefined, lastPacket: now });
-      if (rising && getSettings().announceRecording) Speech.speak('Camera active.', { rate: 1.1 });
-      if (rising && getSettings().buttonTriggersAssistant) buttonListeners.forEach((l) => l());
+      // The busy flag also rises when the glasses' AI microphone starts, so wait: if a voice
+      // recording begins (54 12 04) it is the mic, not the camera, and we stay quiet.
+      if (rising && getSettings().announceRecording) {
+        voiceSeen = false;
+        setTimeout(() => { if (s.busy && !voiceSeen) Speech.speak('Camera active.', { rate: 1.1, language: getSettings().voiceLanguage }); }, 4000);
+      }
       break;
     }
   }
