@@ -32,9 +32,10 @@ function sources(j) {
   return chunks.map((c) => c.web).filter(Boolean).map((w) => ({ title: w.title ?? w.uri, url: w.uri })).slice(0, 6);
 }
 
-export async function respond({ model, system, history, text, imageBase64, search, file }) {
+export async function respond({ model, system, history, text, imageBase64, search, file, audio }) {
   const contents = history.map((h) => ({ role: h.role === 'assistant' ? 'model' : 'user', parts: [{ text: h.text }] }));
-  const parts = [{ text: text || 'What do you see?' }];
+  const parts = [{ text: audio ? (text ? text + '\n' : '') + 'The user asked this out loud in the attached audio. Put an exact transcript of their words in "heard", then answer them.' : text || 'What do you see?' }];
+  if (audio) parts.push({ inline_data: { mime_type: audio.mime, data: audio.base64 } });
   if (imageBase64) parts.push({ inline_data: { mime_type: 'image/jpeg', data: imageBase64 } });
   if (file) parts.push({ inline_data: { mime_type: file.mime, data: file.base64 } });
   contents.push({ role: 'user', parts });

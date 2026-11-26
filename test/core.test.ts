@@ -6,6 +6,7 @@ import { parseAssistantTurn, validateAction } from '../src/intents';
 import { addFact, forget, addTurn, memoryPrompt, EMPTY, MAX_HISTORY } from '../src/memoryCore';
 import { BUILT_IN_MODES, importModes } from '../src/modes';
 import { markdownToHtmlBody, documentHtml, fileNameFor } from '../src/docCore';
+import { splitForSpeech } from '../src/speechCore';
 
 const BK = (process.env.USERPROFILE ?? '/nonexistent') + '/Documents/G2-Glasses-Diagnostics/media-backup/';
 let fails = 0;
@@ -87,6 +88,19 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('markdown: HTML is escaped (no injection)', !x.includes('<script>') && x.includes('&lt;script&gt;') && x.includes('&amp;'), x);
   check('document has title when no H1', documentHtml('My Plan', 'text').includes('<h1>My Plan</h1>'), 'no title');
   check('safe file name', fileNameFor('Q4: report / draft*?', 'pdf') === 'Q4 report draft.pdf' && fileNameFor('***', 'md') === 'Alice document.md', fileNameFor('Q4: report / draft*?', 'pdf'));
+}
+
+// ---- speed: spoken-question transcript + early speech ----
+{
+  const t = parseAssistantTurn('{"heard":"what time is it","reply":"It is noon.","actions":[]}', []);
+  check('heard transcript parsed', t.heard === 'what time is it' && t.reply === 'It is noon.', t);
+  const [a, b] = splitForSpeech('Short answer.');
+  check('short answer stays one piece', a === 'Short answer.' && b === '', [a, b]);
+  const long = 'The Milwaukee Brewers won the World Series on October 28, 2026. ' + 'They beat the Rays in five games and it was the first title in franchise history. '.repeat(3);
+  const [f, r] = splitForSpeech(long);
+  check('long answer splits after first sentence', f.endsWith('2026.') && r.startsWith('They beat') && (f + ' ' + r).replace(/\s+/g, ' ').trim() === long.replace(/\s+/g, ' ').trim(), [f, r.slice(0, 30)]);
+  const [g, h] = splitForSpeech('x'.repeat(300));
+  check('no sentence end: still splits safely', g.length > 0 && g.length + h.length === 300, [g.length, h.length]);
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

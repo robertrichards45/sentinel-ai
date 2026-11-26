@@ -1,4 +1,4 @@
-import { respond, transcribe, Source, Attachment } from './ai';
+import { respond, transcribe, audioOf, Source, Attachment } from './ai';
 import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
 import { runAction } from './actions';
 import { memory } from './memory';
@@ -27,8 +27,10 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
   const s = getSettings();
   const mode = allModes().find((m) => m.id === (opts.modeId ?? s.activeMode)) ?? allModes()[0];
   let you = opts.text?.trim() ?? '';
-  if (opts.audioUri) you = await transcribe(opts.audioUri);
-  if (!you && !opts.imageBase64 && !opts.file) return { you: '', alice: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
+  // Translator needs the words first; every other mode sends the recording straight to the AI (faster).
+  const audio = opts.audioUri && mode.id !== 'translator' ? await audioOf(opts.audioUri) : undefined;
+  if (opts.audioUri && !audio) you = await transcribe(opts.audioUri);
+  if (!you && !audio && !opts.imageBase64 && !opts.file) return { you: '', alice: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
 
   const offline = !opts.imageBase64 && !opts.file && mode.id !== 'translator' ? offlineAnswer(you) : null;
   if (offline) {
@@ -44,9 +46,10 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
 
   const instructions = [mode.prompt, ACTION_SCHEMA_PROMPT, `Available modes: ${allModes().map((m) => m.id).join(', ')}`, s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`].join('\n\n');
   const history = s.memoryEnabled ? memory.get().history.map((h) => ({ role: h.role, text: h.text })) : [];
-  const question = you || (opts.file ? `Read "${opts.file.name}" to me and tell me what it is.` : mode.wantsImage ? 'What do you see?' : '');
-  const ans = await respond(mode.id, instructions, history, question, opts.imageBase64, opts.file);
+  const question = you || (audio ? '' : opts.file ? `Read "${opts.file.name}" to me and tell me what it is.` : mode.wantsImage ? 'What do you see?' : '');
+  const ans = await respond(mode.id, instructions, history, question, opts.imageBase64, opts.file, audio);
   const turn = parseAssistantTurn(ans.text, allModes().map((m) => m.id));
+  const asked = question || turn.heard || ans.heard || '(spoken question)';
 
   const outcomes: string[] = [];
   if (turn.reply) await speak(mode.speakFull || opts.file ? turn.reply : turn.reply.slice(0, 1200), undefined, mode.id);
@@ -54,6 +57,6 @@ export async function ask(opts: { text?: string; audioUri?: string; imageBase64?
     try { outcomes.push(await runAction(a)); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
   }
   if (outcomes.length) await speak(outcomes.join(' '), undefined, mode.id);
-  if (s.memoryEnabled) { await memory.turn('user', question); await memory.turn('assistant', turn.reply); }
-  return { you: question, alice: turn.reply, outcomes, mode: mode.id, t: Date.now(), via: `${ans.provider} · ${ans.model}`, ms: ans.ms, sources: ans.sources };
+  if (s.memoryEnabled) { await memory.turn('user', asked); await memory.turn('assistant', turn.reply); }
+  return { you: asked, alice: turn.reply, outcomes, mode: mode.id, t: Date.now(), via: `${ans.provider} · ${ans.model}`, ms: ans.ms, sources: ans.sources };
 }

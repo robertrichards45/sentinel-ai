@@ -16,7 +16,7 @@ export type Action =
   | { type: 'set_mode'; mode: string }
   | { type: 'document'; title: string; format: 'pdf' | 'text'; content: string };
 
-export type AssistantTurn = { reply: string; actions: Action[] };
+export type AssistantTurn = { reply: string; actions: Action[]; heard?: string };
 
 const str = (v: unknown, max = 500) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
 const iso = (v: unknown) => {
@@ -75,14 +75,15 @@ export function parseAssistantTurn(raw: string, knownModes: string[]): Assistant
     const actions = Array.isArray(j.actions)
       ? (j.actions.slice(0, 5).map((a: any) => validateAction(a, knownModes)).filter(Boolean) as Action[])
       : [];
-    return { reply: reply || (actions.length ? 'Okay.' : raw.trim()), actions };
+    const heard = typeof j.heard === 'string' && j.heard.trim() ? j.heard.trim().slice(0, 2000) : undefined;
+    return { reply: reply || (actions.length ? 'Okay.' : raw.trim()), actions, ...(heard ? { heard } : {}) };
   } catch {
     return { reply: raw.trim(), actions: [] }; // plain-text answer, no actions
   }
 }
 
 export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and nothing else:
-{"reply": "<what to say aloud, short, natural>", "actions": [ ... ]}
+{"heard": "<only when the user spoke: exact transcript of their words>", "reply": "<what to say aloud, short, natural>", "actions": [ ... ]}
 "actions" may be empty. Allowed actions (use ISO 8601 with the user's UTC offset for times):
 {"type":"remember","fact":"..."}            only when the user asks you to remember something
 {"type":"forget","match":"..."}

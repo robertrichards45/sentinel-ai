@@ -2,7 +2,8 @@
 //   GET  /health
 //   POST /v1/register     {installId?}                          -> {installId, token}
 //   POST /v1/transcribe   {audioBase64, mime}                   -> {text, provider, model, ms}
-//   POST /v1/respond      {mode, system, history, text, imageBase64?, file?: {mime, base64, name}, provider?}
+//   POST /v1/respond      {mode, system, history, text, imageBase64?, file?: {mime, base64, name}, audio?: {mime, base64}, provider?}
+//                         audio = the user's spoken question (one round trip instead of transcribe + respond)
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
 //   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
@@ -41,6 +42,7 @@ async function body(req) {
 }
 
 // Documents Alice can read (sent inline to the model).
+const AUDIO_TYPES = ['audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp3', 'audio/mpeg'];
 const FILE_TYPES = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const clean = (s, max) => (typeof s === 'string' ? s.slice(0, max) : '');
 
@@ -97,13 +99,21 @@ export const server = createServer(async (req, res) => {
 
     const mode = clean(b.mode, 32) || 'general';
     const rt = route(mode, b.provider);
+    let audio = b.audio && typeof b.audio.base64 === 'string' && AUDIO_TYPES.includes(b.audio.mime) ? { mime: b.audio.mime, base64: b.audio.base64 } : undefined;
+    let heard;
+    if (audio && rt.name !== 'gemini') { // only Gemini takes audio directly; others transcribe first
+      let tname = config.transcribeProvider; if (!hasKey(tname)) tname = rt.name;
+      heard = (await providerFor(tname).transcribe({ audioBase64: audio.base64, mime: audio.mime })).text;
+      b.text = heard; audio = undefined;
+    }
     const history = Array.isArray(b.history) ? b.history.slice(-24).map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', text: clean(h.text, 4000) })) : [];
     const r = await providerFor(rt.name).respond({
       model: rt.model, system: clean(b.system, 20000), history, text: clean(b.text, 8000),
       imageBase64: typeof b.imageBase64 === 'string' ? b.imageBase64 : undefined, search: rt.search,
+      audio,
       file: b.file && typeof b.file.base64 === 'string' && FILE_TYPES.includes(b.file.mime) ? { mime: b.file.mime, base64: b.file.base64, name: clean(b.file.name, 120) || 'document' } : undefined,
     });
-    return send(res, 200, { text: r.text, provider: rt.name, model: rt.model, tier: rt.tier, ms: Date.now() - t0, usage: r.usage, costUsd: costUsd(rt.model, r.usage), sources: r.sources });
+    return send(res, 200, { text: r.text, heard, provider: rt.name, model: rt.model, tier: rt.tier, ms: Date.now() - t0, usage: r.usage, costUsd: costUsd(rt.model, r.usage), sources: r.sources });
   } catch (e) {
     const status = e.status && e.status >= 400 && e.status < 600 ? (e.status === 401 || e.status === 403 ? 502 : e.status) : 500;
     console.error(new Date().toISOString(), req.method, url.pathname, status, String(e.message).slice(0, 200)); // never logs bodies or keys

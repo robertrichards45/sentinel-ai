@@ -113,3 +113,15 @@ test('respond accepts a PDF or text file and ignores unknown types', async () =>
   const bad = await (await post('/v1/respond', { mode: 'reader', text: 'x', file: { mime: 'application/x-msdownload', base64: 'AAAA' } }, token)).json();
   assert.doesNotMatch(bad.text, /\[file/);
 });
+
+test('respond takes spoken audio in one call (Gemini) or transcribes first (others)', async () => {
+  const { issueToken } = await import('../src/auth.mjs');
+  const token = issueToken('audiotester01').token;
+  const g = await (await post('/v1/respond', { mode: 'general', system: 's', audio: { mime: 'audio/m4a', base64: 'AAAA' } }, token)).json();
+  assert.match(g.text, /\[audio audio\/m4a\]/);
+  assert.equal(g.heard, undefined);
+  const o = await (await post('/v1/respond', { mode: 'translator', system: 's', audio: { mime: 'audio/m4a', base64: 'AAAA' } }, token)).json();
+  assert.equal(o.provider, 'openai');
+  assert.equal(o.heard, 'mock transcript (audio/m4a)');
+  assert.doesNotMatch(o.text, /\[audio/);
+});

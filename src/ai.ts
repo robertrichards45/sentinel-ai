@@ -14,7 +14,7 @@ const INSTALL = 'alice_install_id';
 
 export class AIError extends Error {}
 export type Source = { title: string; url: string };
-export type AIAnswer = { text: string; provider: string; model: string; ms: number; sources: Source[]; costUsd: number | null };
+export type AIAnswer = { heard?: string; text: string; provider: string; model: string; ms: number; sources: Source[]; costUsd: number | null };
 
 const server = () => (getSettings().serverUrl || DEFAULT_SERVER).replace(/\/+$/, '');
 
@@ -52,6 +52,11 @@ async function call(path: string, body: unknown, timeoutMs = 60000, retried = fa
   }
 }
 
+/** A recording as an attachment for respond() (one round trip). */
+export async function audioOf(fileUri: string): Promise<{ mime: string; base64: string }> {
+  return { mime: /\.wav$/i.test(fileUri) ? 'audio/wav' : 'audio/m4a', base64: await new File(fileUri).base64() };
+}
+
 /** Speech-to-text for a recorded file (m4a or wav). */
 export async function transcribe(fileUri: string): Promise<string> {
   const audioBase64 = await new File(fileUri).base64();
@@ -64,9 +69,9 @@ export type ChatMsg = { role: 'user' | 'assistant'; text: string };
 
 export type Attachment = { mime: string; base64: string; name: string };
 
-export async function respond(mode: string, system: string, history: ChatMsg[], text: string, imageBase64?: string, file?: Attachment): Promise<AIAnswer> {
-  const j = await call('/v1/respond', { mode, system, history, text, imageBase64, file, provider: getSettings().providerOverride || undefined }, file ? 120000 : 60000);
-  return { text: String(j.text ?? ''), provider: j.provider ?? '?', model: j.model ?? '?', ms: j.ms ?? 0, sources: Array.isArray(j.sources) ? j.sources : [], costUsd: j.costUsd ?? null };
+export async function respond(mode: string, system: string, history: ChatMsg[], text: string, imageBase64?: string, file?: Attachment, audio?: { mime: string; base64: string }): Promise<AIAnswer> {
+  const j = await call('/v1/respond', { mode, system, history, text, imageBase64, file, audio, provider: getSettings().providerOverride || undefined }, file ? 120000 : 60000);
+  return { heard: typeof j.heard === 'string' ? j.heard : undefined, text: String(j.text ?? ''), provider: j.provider ?? '?', model: j.model ?? '?', ms: j.ms ?? 0, sources: Array.isArray(j.sources) ? j.sources : [], costUsd: j.costUsd ?? null };
 }
 
 /** Settings screen: is the server reachable, which AI is active? */

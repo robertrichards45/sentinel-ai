@@ -2,6 +2,7 @@ import * as Speech from 'expo-speech';
 import { AudioRecorder, AudioPlayer, createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
 import { speechAudio } from './ai';
+import { splitForSpeech } from './speechCore';
 import { getSettings } from './settings';
 
 /**
@@ -38,6 +39,14 @@ export async function enableVoiceSession() {
   const p = await requestRecordingPermissionsAsync();
   if (!p.granted) throw new Error('Microphone permission is needed.');
   await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'duckOthers' });
+}
+
+/**
+ * Before Alice speaks: leave "phone call" mode so iOS plays her through the normal media route
+ * (Bluetooth glasses/headphones when connected, otherwise the loudspeaker, never the earpiece).
+ */
+export async function enablePlaybackSession() {
+  try { await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'duckOthers' }); } catch {}
 }
 
 /** Select the glasses (Bluetooth) mic if present. Returns the input name in use. */
@@ -107,7 +116,7 @@ function speakIphone(text: string, language: string, rate: number, pitch: number
 }
 
 async function playWav(base64: string, gen: number): Promise<void> {
-  const f = new File(Paths.cache, `alice-voice-${gen}.wav`);
+  const f = new File(Paths.cache, `alice-voice-${gen}-${Date.now()}.wav`);
   if (f.exists) f.delete();
   f.create();
   await f.write(base64, { encoding: 'base64' });
@@ -132,11 +141,23 @@ export function speak(text: string, language?: string, modeId?: string): Promise
   setSpeaking(true);
   const lang = language ?? s.voiceLanguage;
   const run = async () => {
+    await enablePlaybackSession();
+    if (gen !== generation) return;
     if (voice !== 'iphone' && !s.privacyMode) {
+      const style = styleFor(s.voiceStyle, s.speechRate, s.voicePitch);
+      const [first, rest] = splitForSpeech(text.slice(0, 3000));
+      // Voice both parts at once; play the first as soon as it's ready.
+      const firstP = speechAudio(first, voice, style);
+      const restP = rest ? speechAudio(rest, voice, style).catch(() => null) : Promise.resolve(null);
       try {
-        const a = await speechAudio(text.slice(0, 3000), voice, styleFor(s.voiceStyle, s.speechRate, s.voicePitch));
+        const a = await firstP;
         if (gen !== generation) return;
         await playWav(a.audioBase64, gen);
+        if (!rest || gen !== generation) return;
+        const b = await restP;
+        if (gen !== generation) return;
+        if (b) await playWav(b.audioBase64, gen);
+        else await speakIphone(rest, lang, s.speechRate, s.voicePitch, gen);
         return;
       } catch { /* offline, quota or server issue: fall back to the iPhone voice */ }
     }
