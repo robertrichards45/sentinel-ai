@@ -1,0 +1,58 @@
+# Builds SENTINEL AI for iPhone on GitHub's Mac runners (no Mac needed).
+# Output: an UNSIGNED .ipa artifact. Sign + install it from Windows with
+# Sideloadly (free Apple ID, re-sign every 7 days) — see docs/INSTALL.md.
+name: iOS build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx tsx test/protocol.test.ts
+        env: { G2_FIXTURES: test/fixtures }
+      - run: npx tsx test/core.test.ts
+        env: { G2_FIXTURES: test/fixtures }
+
+  ios:
+    needs: test
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
+        env: { CI: 1 }
+      - name: Show Xcode
+        run: xcodebuild -version
+      - name: Build (Release, unsigned)
+        run: |
+          set -o pipefail
+          WS=$(ls -d ios/*.xcworkspace | head -n1); SCHEME=$(basename "$WS" .xcworkspace)
+          echo "Workspace $WS  scheme $SCHEME"
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -n 80
+      - name: Package .ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -qry SENTINEL-AI-unsigned.ipa Payload
+          ls -lh SENTINEL-AI-unsigned.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SENTINEL-AI-unsigned-ipa
+          path: SENTINEL-AI-unsigned.ipa
+          retention-days: 30

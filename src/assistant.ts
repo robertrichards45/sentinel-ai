@@ -1,0 +1,59 @@
+import { respond, transcribe } from './ai';
+import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
+import { runAction } from './actions';
+import { memory } from './memory';
+import { getSettings } from './settings';
+import { allModes } from './modeStore';
+import { speak, localeFor } from './voice';
+import { glassesStatusText } from './glassesState';
+
+export type Exchange = { you: string; sentinel: string; outcomes: string[]; mode: string; t: number };
+
+/** Offline commands: answered on the phone with no network and no AI. */
+export function offlineAnswer(text: string): string | null {
+  const t = text.toLowerCase();
+  if (/\b(what time|the time)\b/.test(t)) return `It's ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.`;
+  if (/\b(what('s| is) the date|today'?s date|what day)\b/.test(t)) return `Today is ${new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}.`;
+  if (/\b(glasses|battery|status)\b/.test(t) && t.split(' ').length < 8) return glassesStatusText();
+  if (/\bwhat do you (know|remember) about me\b/.test(t)) {
+    const f = memory.get().facts;
+    return f.length ? 'You asked me to remember: ' + f.map((x) => x.text).join('; ') + '.' : 'You have not asked me to remember anything yet.';
+  }
+  return null;
+}
+
+/** One full turn: optional speech file → text → AI (+image) → actions → spoken reply. */
+export async function ask(opts: { text?: string; audioUri?: string; imageBase64?: string; modeId?: string }): Promise<Exchange> {
+  const s = getSettings();
+  const mode = allModes().find((m) => m.id === (opts.modeId ?? s.activeMode)) ?? allModes()[0];
+  let you = opts.text?.trim() ?? '';
+  if (opts.audioUri) you = await transcribe(opts.audioUri, mode.id === 'translator' ? undefined : s.voiceLanguage);
+  if (!you && !opts.imageBase64) return { you: '', sentinel: "I didn't catch that.", outcomes: [], mode: mode.id, t: Date.now() };
+
+  const offline = !opts.imageBase64 && mode.id !== 'translator' ? offlineAnswer(you) : null;
+  if (offline) {
+    await speak(offline);
+    return { you, sentinel: offline, outcomes: [], mode: mode.id, t: Date.now() };
+  }
+
+  if (mode.id === 'translator') {
+    const out = await respond(`${mode.prompt}\nTarget language: ${s.translateTo}. Return only the translated text.`, [], you);
+    await speak(out, localeFor(s.translateTo));
+    return { you, sentinel: out, outcomes: [], mode: mode.id, t: Date.now() };
+  }
+
+  const instructions = [mode.prompt, ACTION_SCHEMA_PROMPT, `Available modes: ${allModes().map((m) => m.id).join(', ')}`, s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`].join('\n\n');
+  const history = s.memoryEnabled ? memory.get().history.map((h) => ({ role: h.role, text: h.text })) : [];
+  const question = you || (mode.wantsImage ? 'What do you see?' : '');
+  const raw = await respond(instructions, history, question, opts.imageBase64);
+  const turn = parseAssistantTurn(raw, allModes().map((m) => m.id));
+
+  const outcomes: string[] = [];
+  if (turn.reply) await speak(mode.speakFull ? turn.reply : turn.reply.slice(0, 1200));
+  for (const a of turn.actions) {
+    try { outcomes.push(await runAction(a)); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
+  }
+  if (outcomes.length) await speak(outcomes.join(' '));
+  if (s.memoryEnabled) { await memory.turn('user', question); await memory.turn('assistant', turn.reply); }
+  return { you: question, sentinel: turn.reply, outcomes, mode: mode.id, t: Date.now() };
+}

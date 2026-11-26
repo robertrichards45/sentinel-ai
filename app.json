@@ -1,25 +1,64 @@
 {
   "expo": {
-    "name": "G2-Companion",
-    "slug": "G2-Companion",
-    "version": "1.0.0",
+    "name": "G2 Companion",
+    "slug": "g2-companion",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.robert.g2companion",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "G2 Companion connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
+        "NSMicrophoneUsageDescription": "G2 Companion uses the glasses' microphone (or the iPhone's) for the voice assistant and translation.",
+        "NSPhotoLibraryAddUsageDescription": "G2 Companion saves photos and videos imported from your glasses to your photo library.",
+        "NSPhotoLibraryUsageDescription": "G2 Companion lets you pick a photo for the AI to describe.",
+        "NSLocalNetworkUsageDescription": "G2 Companion talks to the glasses' own Wi-Fi hotspot to transfer media.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "UIBackgroundModes": [
+          "bluetooth-central",
+          "audio"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "G2 Companion connects to your G2 glasses over Bluetooth."
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "G2 Companion uses the glasses' microphone for the voice assistant and translation."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "G2 Companion saves imported glasses media to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "G2 Companion lets you pick a photo for the AI to describe."
+        }
+      ],
+      "expo-mail-composer",
+      "expo-sharing"
+    ]
   }
 }
