@@ -2,6 +2,7 @@ import { micExplainsBusy } from '../micState';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { glasses } from '../ble';
+import { activeGlasses, bluetoothAudioName } from '../glasses/connector';
 import { useGlasses, useMemory, useSettings } from '../hooks';
 import { updateSettings } from '../settings';
 import { Orb } from '../Orb';
@@ -22,7 +23,17 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
   const g = useGlasses();
   const s = useSettings();
   const m = useMemory();
-  const [label, color] = LINK[g.link] ?? ['Unknown', C.sub];
+  const info = activeGlasses();
+  const own = info.caps.dataLink; // G2: Alice's own data link; others: plain iPhone Bluetooth audio
+  const [btName, setBtName] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (own) return;
+    const check = () => bluetoothAudioName().then(setBtName);
+    check(); const t = setInterval(check, 5000); return () => clearInterval(t);
+  }, [own]);
+  const [label, color] = own ? (LINK[g.link] ?? ['Unknown', C.sub])
+    : info.id === 'none' ? ['Phone only', C.sub]
+    : btName ? [`${btName} connected`, C.mint] : ['Glasses not connected', C.sub];
   const connected = g.link === 'connected';
   const busySec = g.busy && g.busySince ? Math.round((Date.now() - g.busySince) / 1000) : 0;
 
@@ -30,7 +41,7 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
     <ScrollView style={S.screen} contentContainerStyle={S.pad}>
       <View style={[S.row, { justifyContent: 'space-between', marginTop: 4 }]}>
         <Pill dot text={label} color={color} />
-        {g.heartbeat !== undefined ? <Pill dot text={`${g.heartbeat}%`} color={g.heartbeat <= s.lowBatteryAlert ? C.red : C.mint} /> : null}
+        {own && g.heartbeat !== undefined ? <Pill dot text={`${g.heartbeat}%`} color={g.heartbeat <= s.lowBatteryAlert ? C.red : C.mint} /> : null}
       </View>
 
       <View style={{ alignItems: 'center', marginTop: 8 }}>
@@ -52,7 +63,7 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
         </Glass>
       </Pressable>
 
-      {g.busy && !g.aiListening && !micExplainsBusy() && busySec >= 15 ? (
+      {own && g.busy && !g.aiListening && !micExplainsBusy() && busySec >= 15 ? (
         <Card tone="alert">
           <View style={S.row}><Ionicons name="radio-button-on" size={18} color={C.red} /><Text style={[S.h2, { color: C.red }]}>Glasses camera may be recording{busySec ? ` · ${busySec} s` : ''}</Text></View>
           <Text style={S.dim}>Don't plug the glasses into USB until it stops. Plugging in mid-recording is what overwrote a photo before.</Text>
@@ -60,13 +71,13 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
       ) : null}
 
       <View style={S.row}>
-        <Pressable style={{ flex: 1 }} onPress={() => go('media')} accessibilityRole="button" accessibilityLabel="Photos and videos">
+        {own ? <Pressable style={{ flex: 1 }} onPress={() => go('media')} accessibilityRole="button" accessibilityLabel="Photos and videos">
           <Glass style={{ padding: 16, gap: 4 }}>
             <Ionicons name="images" size={20} color={C.pink} />
             <Text style={{ fontFamily: F.displayBold, fontSize: 28, color: C.ink }}>{g.mediaCount ?? '–'}</Text>
             <Text style={S.dim}>{g.newMediaSinceImport ? `${g.newMediaSinceImport} new to import` : 'photos & videos'}</Text>
           </Glass>
-        </Pressable>
+        </Pressable> : null}
         <Pressable style={{ flex: 1 }} onPress={() => go('memory')} accessibilityRole="button" accessibilityLabel="Memory">
           <Glass style={{ padding: 16, gap: 4 }}>
             <Ionicons name="bookmark" size={20} color={C.cyan} />
@@ -76,7 +87,14 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
         </Pressable>
       </View>
 
-      <Card title="Glasses">
+      {!own ? (
+        <Card title={info.name}>
+          <Text style={S.dim}>{info.id === 'none' ? 'Alice uses the iPhone speaker, microphone and camera.' : btName ? `Alice talks through ${btName}. Say "Hey Alice" or tap the orb.` : 'Put the glasses on and connect them in iPhone Settings > Bluetooth. Alice uses them automatically.'}</Text>
+          {info.comingSoon ? <Text style={[S.dim, { color: C.amber }]}>{info.comingSoon}</Text> : null}
+          <Btn kind="ghost" icon="swap-horizontal-outline" title="Change glasses" onPress={() => updateSettings({ glassesModel: '' })} />
+        </Card>
+      ) : null}
+      {own ? <Card title="Glasses">
         <Line label="Clock" value={g.clockSkewSec === undefined ? '–' : Math.abs(g.clockSkewSec) > 120 ? `${Math.round(g.clockSkewSec / 60)} min off` : 'Correct'}
           valueStyle={g.clockSkewSec !== undefined && Math.abs(g.clockSkewSec) > 120 ? { color: C.amber } : undefined} />
         <Line label="Wi-Fi name" value={g.ssid ?? '–'} />
@@ -85,7 +103,7 @@ export default function Home({ go }: { go: (t: Tab) => void }) {
         {connected
           ? <Btn kind="ghost" icon="close-circle-outline" title="Disconnect" onPress={() => glasses.disconnect()} />
           : <Btn icon="glasses-outline" title="Connect glasses" onPress={() => glasses.connect().catch(() => {})} />}
-      </Card>
+      </Card> : null}
 
       <Card title="Privacy">
         <Toggle label="Privacy mode" hint="Pauses all AI. Nothing leaves this iPhone." value={s.privacyMode} onChange={(v) => updateSettings({ privacyMode: v })} />

@@ -10,6 +10,7 @@ import { glasses, WRITES_ENABLED } from '../ble';
 import { FEATURES, STATUS_LABEL, Status } from '../features';
 import { diaryEvents } from '../diary';
 import { previewLiveVoice } from '../live';
+import { glassesInfo } from '../glasses/catalog';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
@@ -18,6 +19,7 @@ const STATUS_COLOR: Record<Status, string> = { tested: C.mint, built: C.violet, 
 
 export default function Settings() {
   const s = useSettings();
+  const gInfo = glassesInfo(s.glassesModel || 'g2');
   const [srv, setSrv] = useState<{ ok: boolean; detail: string } | null>(null);
   const [msg, setMsg] = useState('');
   const [pack, setPack] = useState('');
@@ -121,17 +123,25 @@ export default function Settings() {
         <Toggle label="Live conversation" hint="Talk back and forth like a phone call, and interrupt Alice any time. Turn off to ask one question at a time." value={s.liveConversation} onChange={(v) => updateSettings({ liveConversation: v })} />
       </Card>
 
-      <Card title="Talk through your glasses">
+      <Card title="Your glasses" right={<Btn kind="ghost" title="Change" onPress={() => updateSettings({ glassesModel: '' })} />}>
+        <Text style={S.body}>{gInfo.name}</Text>
+        <Text style={S.dim}>{gInfo.examples}</Text>
+        {gInfo.comingSoon ? <Text style={[S.dim, { color: C.amber }]}>{gInfo.comingSoon}</Text> : null}
+      </Card>
+
+      {gInfo.caps.dataLink ? <Card title="Talk through your glasses">
         <Text style={S.dim}>Use your glasses' own AI button or wake word, then just talk. Alice hears you through the glasses' microphone and answers, on any screen and while your phone is locked, as long as Alice is open in the background and the glasses are connected.</Text>
         <Text style={S.dim}>Also works: a Siri shortcut with "Open URLs" alice://talk named "Alice", then "Hey Siri, Alice".</Text>
-      </Card>
+      </Card> : null}
 
       <Card title="Voice">
         <Toggle label="Daily heads-up" hint="The first time your glasses connect each day, Alice tells you what's on your calendar today." value={s.dailyHeadsUp} onChange={(v) => updateSettings({ dailyHeadsUp: v })} />
         <Toggle label={'"Hey Alice"'} hint={'Say "Hey Alice" to start talking, no Siri. Uses the phone\'s microphone and Apple\'s on-device recognition (nothing is sent until she wakes). Works while Alice is open or in the background, not after you swipe her closed.'} value={s.heyAlice} onChange={(v) => updateSettings({ heyAlice: v })} />
+        {gInfo.caps.dataLink ? <>
         <Toggle label="Conversation through the glasses" hint="Press the glasses button and just talk. Alice hears when you stop, answers, then listens for a follow-up, like the Wheat app." value={s.glassesConversation} onChange={(v) => updateSettings({ glassesConversation: v })} />
         <Toggle label="Hear Alice in the glasses" hint="Connects the glasses to your iPhone as Bluetooth headphones (the same way the Wheat app does), so Alice's voice, and music, play through them." value={s.glassesAudio} onChange={(v) => updateSettings({ glassesAudio: v })} />
         {s.glassesAudio ? <View style={[S.row, { justifyContent: 'space-between' }]}><Text style={[S.dim, { flex: 1 }]}>{glasses.lastCommand ? (glasses.lastCommand.error ? `Couldn't reach the glasses: ${glasses.lastCommand.error}` : `Headphones request sent ${new Date(glasses.lastCommand.at).toLocaleTimeString()}`) : 'Waiting for the glasses to connect'}</Text><Btn kind="ghost" title="Send again" onPress={() => glasses.syncAudio(true)} /></View> : null}
+        </> : null}
         <Toggle label="Use glasses microphone" hint="When the glasses are connected as headphones" value={s.preferGlassesMic} onChange={(v) => updateSettings({ preferGlassesMic: v })} />
         <Field label="Translate into" value={s.translateTo} onChange={(v) => updateSettings({ translateTo: v })} />
         <Field label="Voice language (e.g. en-US)" value={s.voiceLanguage} onChange={(v) => updateSettings({ voiceLanguage: v })} />
@@ -174,7 +184,7 @@ export default function Settings() {
           </View>
         )) : null}
       </Card>
-      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.9.12. Unofficial; not affiliated with the glasses maker.</Text>
+      <Text style={[S.dim, { textAlign: 'center' }]}>Alice 0.10.0. Unofficial; not affiliated with the glasses maker.</Text>
     </ScrollView>
   );
 }

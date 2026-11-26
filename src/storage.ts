@@ -10,7 +10,10 @@ export async function readJson<T>(name: string, fallback: T): Promise<T> {
   try {
     const f = new File(Paths.document, name);
     if (!f.exists) return fallback;
-    return { ...fallback, ...JSON.parse(await f.text()) } as T;
+    const saved = JSON.parse(await f.text());
+    // Objects: merge over the defaults (new settings get their default). Lists and plain values: as saved.
+    if (fallback && typeof fallback === 'object' && !Array.isArray(fallback) && saved && typeof saved === 'object' && !Array.isArray(saved)) return { ...fallback, ...saved } as T;
+    return (Array.isArray(fallback) ? (Array.isArray(saved) ? saved : fallback) : saved ?? fallback) as T;
   } catch {
     return fallback;
   }

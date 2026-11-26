@@ -23,6 +23,10 @@ import { useGlasses } from './src/hooks';
 import { onGlassesButton } from './src/glassesState';
 import { requestListen, isTalkLink, onWake } from './src/triggers';
 import { wakeWordReady } from './src/wakeWord';
+import { Onboarding } from './src/screens/Onboarding';
+import { startGlasses, activeGlasses as glassesInfoActive } from './src/glasses/connector';
+import { maybeHeadsUp } from './src/headsUp';
+import { getSettings, onSettings } from './src/settings';
 import './src/headsUp';
 import './src/learn';
 import { live, LiveState } from './src/live';
@@ -74,21 +78,27 @@ function Shell() {
   const [fontsLoaded] = useFonts({ Sora_300Light, Sora_600SemiBold, Sora_700Bold, Inter_400Regular, Inter_500Medium, Inter_600SemiBold });
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>('home');
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     (async () => {
       await Promise.all([loadSettings(), memory.load(), loadModes()]);
+      setNeedsSetup(!getSettings().glassesModel);
       setReady(true);
-      glasses.connect().catch(() => {}); // automatic connection on launch
+      if (getSettings().glassesModel) {
+        startGlasses(); // connects G2's data link; other glasses are plain iPhone Bluetooth audio
+        if (!glassesInfoActive().caps.dataLink) maybeHeadsUp(2000);
+      }
     })();
     // Hands-free starts: alice://talk (Siri shortcut, Action Button) and the glasses' button.
     const talk = () => { setTab('assist'); requestListen(); };
     const offWake = onWake(talk);
+    const offSetup = onSettings((st) => { if (!st.glassesModel) setNeedsSetup(true); });
     wakeWordReady();
     Linking.getInitialURL().then((u) => { if (isTalkLink(u)) talk(); });
     const sub = Linking.addEventListener('url', ({ url }) => { if (isTalkLink(url)) talk(); });
     const offBtn = onGlassesButton(talk);
-    return () => { sub.remove(); offBtn(); offWake(); };
+    return () => { sub.remove(); offBtn(); offWake(); offSetup(); };
   }, []);
 
   const screens: Record<Tab, React.ReactNode> = {
@@ -99,9 +109,9 @@ function Shell() {
       <StatusBar style="light" />
       <Backdrop />
       <View style={{ flex: 1, paddingTop: inset.top }}>
-        {ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
+        {ready && fontsLoaded && needsSetup ? <Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); }} /> : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
-      {ready && fontsLoaded ? <TabBar tab={tab} setTab={setTab} /> : null}
+      {ready && fontsLoaded && !needsSetup ? <TabBar tab={tab} setTab={setTab} /> : null}
     </View>
   );
 }

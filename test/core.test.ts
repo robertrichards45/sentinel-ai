@@ -1,3 +1,4 @@
+import { GLASSES, glassesInfo } from '../src/glasses/catalog';
 import { parseLearned } from '../src/memoryCore';
 // Unit tests for the pure modules, using the REAL files backed up from the glasses.
 // Run: npx tsx test/core.test.ts
@@ -181,6 +182,15 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('call needs who', v({ type: 'call' }) === null && v({ type: 'call', who: 'Mom' }) !== null);
   check('translator on/off', (v({ type: 'translator', language: 'Spanish', on: true }) as any).on === true && (v({ type: 'translator', on: false }) as any).on === false);
   check('look_up needs query', v({ type: 'look_up' }) === null && v({ type: 'look_up', query: 'Lakers score' }) !== null);
+}
+
+// --- Glasses catalog: every model is complete and only G2 has its own data link ---
+{
+  const ids = GLASSES.map((g) => g.id).join(',');
+  check('catalog has g2, headphones, meta, none', ids === 'g2,headphones,meta,none');
+  check('only G2 uses a data link', GLASSES.filter((g) => g.caps.dataLink).map((g) => g.id).join() === 'g2');
+  check('unknown model falls back to G2', glassesInfo(undefined).id === 'g2' && glassesInfo('nope').id === 'g2');
+  check('every model has setup tips', GLASSES.every((g) => g.setupTips.length > 0));
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

@@ -109,7 +109,11 @@ class LiveSession {
       // headset's call mic (HFP), which would drop Alice to phone-call quality. The mic is the phone's,
       // and the glasses' own mic reaches Alice separately over their data channel. Mode 'default', not
       // 'voiceChat' (voiceChat turns call mode back on); echo cancellation comes from the recorder's voice processing.
-      AudioManager.setSystemOptions({ ios: { category: 'playAndRecord', mode: 'default', options: ['allowBluetoothA2DP', 'defaultToSpeaker', 'duckOthers'] } });
+      // G2: their mic reaches Alice over their own data link, so keep music-quality audio (no call mode).
+      // Other glasses (and Meta): their only mic is the hands-free one, so allow it when they are worn.
+      const model = getSettings().glassesModel || 'g2';
+      const headsetMic = this.useMic && (model === 'headphones' || model === 'meta');
+      AudioManager.setSystemOptions({ ios: { category: 'playAndRecord', mode: 'default', options: headsetMic ? ['allowBluetoothHFP', 'allowBluetoothA2DP', 'defaultToSpeaker', 'duckOthers'] : ['allowBluetoothA2DP', 'defaultToSpeaker', 'duckOthers'] } });
       await AudioManager.setAudioSessionActivity(true);
       const t = await liveSession();
       this.endpoints = t.endpoints; this.model = t.model;

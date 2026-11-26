@@ -20,6 +20,7 @@ export type Settings = {
   voiceStyle: string; // id from VOICE_STYLES in voice.ts
   voicePitch: number; // -2 (deeper) .. +2 (higher)
   modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
+  glassesModel: '' | 'g2' | 'headphones' | 'meta' | 'none'; // '' = not chosen yet (first-launch setup)
   dailyHeadsUp: boolean; // first time the glasses connect each day, Alice tells you what's on today
   heyAlice: boolean; // listen for "Hey Alice" (on-device, phone mic, while Alice is open or in the background)
   glassesConversation: boolean; // hands-free back-and-forth through the glasses mic (official app's commands)
@@ -49,6 +50,7 @@ export const DEFAULTS: Settings = {
   voicePitch: 0,
   modeVoices: {},
   liveConversation: true,
+  glassesModel: '',
   dailyHeadsUp: true,
   heyAlice: false,
   glassesConversation: false, // off until Robert approves the commands
