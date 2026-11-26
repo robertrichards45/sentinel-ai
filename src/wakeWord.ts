@@ -22,13 +22,16 @@ let speaking = false;
 let lastWake = 0;
 let enabled = false;
 let timer: ReturnType<typeof setInterval> | null = null;
+let startedAt = 0;
+let quickFails = 0;
+let pauseUntil = 0;
 onSpeaking((on) => { speaking = on; });
 
 const aliceBusy = () => speaking || appMicBusy() || glassesVoiceActive() || (live.state !== 'off' && live.state !== 'error');
 
 function start() {
-  if (running || !enabled || aliceBusy()) return;
-  running = true;
+  if (running || !enabled || aliceBusy() || Date.now() < pauseUntil) return;
+  running = true; startedAt = Date.now();
   try {
     ExpoSpeechRecognitionModule.start({
       lang: 'en-US',
@@ -56,8 +59,15 @@ ExpoSpeechRecognitionModule.addListener('result', (ev: any) => {
   stop();
   setTimeout(wake, 500); // let iOS release the microphone before Alice opens it
 });
-ExpoSpeechRecognitionModule.addListener('end', () => { running = false; });
-ExpoSpeechRecognitionModule.addListener('error', (e: any) => { running = false; if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });
+// If recognition keeps ending straight away, back off instead of restarting every second (each restart
+// reconfigures the iPhone's audio, which can upset Bluetooth audio devices).
+function ended() {
+  running = false;
+  if (Date.now() - startedAt < 5000) quickFails++; else quickFails = 0;
+  if (quickFails >= 3) { pauseUntil = Date.now() + 60000; note('wake-paused', { quickFails }); quickFails = 0; }
+}
+ExpoSpeechRecognitionModule.addListener('end', ended);
+ExpoSpeechRecognitionModule.addListener('error', (e: any) => { ended(); if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });
 
 async function setEnabled(on: boolean) {
   if (on === enabled) return;

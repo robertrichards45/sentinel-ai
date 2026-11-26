@@ -43,6 +43,22 @@ class GlassesLink {
     if (this.log.length > 5000) this.log.splice(0, 1000);
   }
 
+  /** Auto-reconnect: retry with growing gaps (3 s .. 30 s) until connected or the user disconnects. */
+  private reconnecting = false;
+  private async reconnectLoop() {
+    if (this.reconnecting) return;
+    this.reconnecting = true;
+    let wait = 3000;
+    try {
+      while (this.wantConnected && this.state !== 'connected') {
+        await new Promise((r) => setTimeout(r, wait));
+        if (!this.wantConnected || (this.state as LinkState) === 'connected') break;
+        try { await this.connect(); } catch (e: any) { note('reconnect-failed', { msg: String(e?.message ?? e) }); }
+        wait = Math.min(wait * 2, 30000);
+      }
+    } finally { this.reconnecting = false; }
+  }
+
   /** Find the glasses: first among peripherals iOS already has connected, then by scanning. */
   async connect(): Promise<void> {
     this.wantConnected = true;
@@ -83,13 +99,13 @@ class GlassesLink {
   private async attach(d: Device) {
     this.setState('connecting');
     const dev = (await d.isConnected()) ? d : await d.connect({ timeout: 15000 });
-    await dev.discoverAllServicesAndCharacteristics();
+    await Promise.race([dev.discoverAllServicesAndCharacteristics(), new Promise((_, rej) => setTimeout(() => rej(new Error('service discovery timed out')), 15000))]);
     this.device = dev;
     this.subs.push(
       dev.onDisconnected(() => {
         this.cleanup();
         this.setState('idle', 'Glasses disconnected');
-        if (this.wantConnected) setTimeout(() => this.connect().catch(() => {}), 3000); // auto-reconnect
+        if (this.wantConnected) this.reconnectLoop(); // keeps trying until the glasses are back
       }),
     );
     // Listen-only: enabling notifications is the same step the capture tool used.
@@ -193,6 +209,19 @@ class GlassesLink {
 }
 
 export const glasses = new GlassesLink();
+
+// Headphones watchdog: if the glasses are connected for data but iPhone audio is not going to them,
+// repeat the official app's hello + headphones request (at most once a minute).
+import { AudioManager } from 'react-native-audio-api';
+setInterval(async () => {
+  if (glasses.state !== 'connected' || !getSettings().glassesAudio) return;
+  try {
+    const info = await AudioManager.getDevicesInfo();
+    const all = [...(info.currentOutputs ?? []), ...(info.availableInputs ?? [])];
+    const onGlasses = all.some((d) => /g2/i.test(d.name) || /bluetooth/i.test(d.category));
+    if (!onGlasses) { note('headphones-missing'); glasses.syncAudio(true); }
+  } catch {}
+}, 60000);
 
 // Settings load after the app may already have connected: re-send headset mode when the setting is (re)read or changed.
 let lastWant: boolean | null = null;
