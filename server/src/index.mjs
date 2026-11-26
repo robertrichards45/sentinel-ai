@@ -43,7 +43,7 @@ async function body(req) {
 }
 
 // Documents Alice can read (sent inline to the model).
-const AUDIO_TYPES = ['audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp3', 'audio/mpeg'];
+const AUDIO_TYPES = ['audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp3', 'audio/mpeg', 'audio/ogg'];
 const FILE_TYPES = ['application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html', 'image/jpeg', 'image/png', 'image/heic', 'image/webp'];
 const clean = (s, max) => (typeof s === 'string' ? s.slice(0, max) : '');
 
@@ -100,7 +100,7 @@ export const server = createServer(async (req, res) => {
     const t0 = Date.now();
 
     if (url.pathname === '/v1/transcribe') {
-      const mime = ['audio/wav', 'audio/m4a', 'audio/aac', 'audio/mp3'].includes(b.mime) ? b.mime : 'audio/m4a';
+      const mime = AUDIO_TYPES.includes(b.mime) ? b.mime : 'audio/m4a';
       if (!b.audioBase64) return send(res, 400, { error: 'No audio' });
       let name = config.transcribeProvider;
       if (!hasKey(name)) name = Object.keys(PROVIDERS).find(hasKey) ?? name;
