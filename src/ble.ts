@@ -104,7 +104,8 @@ class GlassesLink {
       );
     watch(UUID.SVC_A, UUID.A_NOTIFY, 'A', parseChannelA);
     watch(UUID.SVC_B, UUID.B_NOTIFY, 'B', parseChannelB);
-    watch(UUID.SVC_C, UUID.C_NOTIFY, 'C', (b) => ({ kind: 'raw', channel: 'C', hex: hex(b), confidence: 'unknown' }));
+    // NEVER subscribe to channel C (FA00/EA01): the glasses drop their headphones (audio) link within
+    // 0.25 s whenever it is switched on (seen 3 times, capture 2026-11-26 03:23/03:34/03:41). The official app never uses it.
     this.setState('connected');
     // Headset mode: ask the glasses to join the iPhone as Bluetooth headphones, so Alice (and music) play through them.
     setTimeout(() => { if (getSettings().glassesAudio) this.syncAudio(); }, 500);
@@ -150,13 +151,7 @@ class GlassesLink {
   syncAudio() {
     if (this.state !== 'connected') return;
     const want = getSettings().glassesAudio;
-    if (!want) return;
-    // The glasses only join as headphones on an off -> on change (02:17 off, 02:19 on = joined; repeated "on" = nothing),
-    // so reset first. If the headphones link was already up it drops and comes back within a few seconds.
-    this.glassesCommand('audioOff')
-      .then(() => new Promise((r) => setTimeout(r, 1500)))
-      .then(() => this.glassesCommand('audioOn'))
-      .catch(() => {});
+    if (want) this.glassesCommand('audioOn').catch(() => {}); // 07..00, exactly as the official app sends it
   }
 
   async disconnect() {
