@@ -1,3 +1,4 @@
+import { shop } from './shop';
 import { selfCheck } from './selfRepair';
 import { recallText } from './convoLog';
 import { openApp } from './apps';
@@ -236,6 +237,7 @@ export async function runAction(a: Action): Promise<string> {
     case 'learn_word': return learnWord(a.word);
     case 'open_app': return openApp(a.name);
     case 'self_check': return selfCheck();
+    case 'shop': return shop(a.item, a.store, a.fulfillment, a.brand);
     case 'recall': return recallText(a.query, a.last, a.who);
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
