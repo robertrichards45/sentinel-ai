@@ -1,4 +1,5 @@
 import { healthSummary } from './health';
+import { musicControl } from './music';
 import { briefingHooks } from './briefingHooks';
 import { runForesight } from './foresight';
 import { whatsNewText, markNewsTold } from './whatsNew';
@@ -278,6 +279,7 @@ async function runActionInner(a: Action): Promise<string> {
     case 'ifttt': return iftttTrigger(a.event, a.value);
     case 'webhook': return runWebhook(a.name, a.value);
     case 'capabilities': return CAPABILITIES_SPOKEN;
+    case 'music_control': return musicControl(a.command);
     case 'whats_new': { const t = whatsNewText(); markNewsTold(); return t; }
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {

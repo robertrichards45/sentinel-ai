@@ -5,6 +5,7 @@ import { recall, dateRange } from '../src/recallCore';
 import { appUrl } from '../src/appsCore';
 import { planOrder, storeLink } from '../src/shopCore';
 import { parseForesight } from '../src/foresightCore';
+import { parseMusicRequest } from '../src/musicCore';
 import { NoiseGate } from '../src/liveCore';
 import { writeFileSync, mkdirSync } from 'fs';
 import { parsePhotoFiling } from '../src/photoCore';
@@ -377,6 +378,16 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('recall action', (validateAction({ type: 'recall', last: 3, who: 'user' }, modes) as any)?.last === 3);
   check('offline open app', (parseOffline('open Spotify') as any)?.action?.name === 'Spotify');
   check('offline self check', (parseOffline('Alice fix yourself') as any)?.action?.type === 'self_check');
+}
+
+// --- 0.18.2: Apple Music ---
+{
+  const p1 = parseMusicRequest('play my workout playlist'); check('music playlist', p1.kind === 'playlist' && p1.term === 'workout', p1);
+  const p2 = parseMusicRequest('play some Drake'); check('music any', p2.kind === 'any' && p2.term === 'Drake', p2);
+  const p3 = parseMusicRequest('play the album Thriller'); check('music album', p3.kind === 'album' && p3.term === 'Thriller', p3);
+  const p4 = parseMusicRequest('shuffle my gym playlist'); check('music shuffle', p4.shuffle && p4.kind === 'playlist' && p4.term === 'shuffle gym'.replace('shuffle ', ''), p4);
+  check('music control mapping', (validateAction({ type: 'music_control', command: 'skip' }, modes) as any)?.command === 'next');
+  check('music control rejects junk', validateAction({ type: 'music_control', command: 'explode' }, modes) === null);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
