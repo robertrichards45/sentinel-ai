@@ -24,5 +24,12 @@ export async function recallText(query: string, last?: number, who?: 'user' | 'a
   await load();
   return describeTurns(recall(log, query, { last, who }));
 }
+/** The last actions Alice took and what came of each, for "why did you do that?". */
+export async function recentActions(n = 8): Promise<string> {
+  await load();
+  const acts = log.filter((x) => x.text.startsWith('[action]')).slice(-n);
+  if (!acts.length) return "I haven't taken any actions recently.";
+  return 'My recent actions, oldest first (explain the reason for each from the conversation around it):\n' + acts.map((x) => `${new Date(x.t).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}: ${x.text.slice(9)}`).join('\n');
+}
 export async function wipeLog() { log = []; deleteFile('convlog.json'); }
 load();

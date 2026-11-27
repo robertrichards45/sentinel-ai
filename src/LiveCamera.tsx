@@ -8,6 +8,7 @@ import { Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { live } from './live';
 import { note } from './diary';
+import { coachFrameMs } from './coach';
 import { C, F, S } from './ui';
 
 export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; hidden?: boolean }) {
@@ -19,17 +20,18 @@ export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; h
   useEffect(() => {
     if (live.state === 'off' || live.state === 'error') live.start();
     note('look-on');
-    let busy = false;
+    let busy = false, last = 0, alive = true;
+    // About 1 picture a second; about 3 a second in workout coach mode so movement shows.
     const t = setInterval(async () => {
-      if (busy || !cam.current || live.state === 'off' || live.state === 'connecting') return;
-      busy = true;
+      if (busy || !cam.current || live.state === 'off' || live.state === 'connecting' || Date.now() - last < coachFrameMs()) return;
+      busy = true; last = Date.now();
       try {
-        const p = await cam.current.takePictureAsync({ quality: 0.35, base64: true, shutterSound: false, skipProcessing: true });
-        if (p?.base64) { live.sendImage(p.base64); setFrames((n) => n + 1); }
+        const p = await cam.current.takePictureAsync({ quality: coachFrameMs() < 1000 ? 0.25 : 0.35, base64: true, shutterSound: false, skipProcessing: true });
+        if (alive && p?.base64) { live.sendImage(p.base64); setFrames((n) => n + 1); }
       } catch {}
       busy = false;
-    }, 1000);
-    return () => { clearInterval(t); note('look-off', { frames }); };
+    }, 100);
+    return () => { alive = false; clearInterval(t); note('look-off', { frames }); };
   }, []);
 
   if (!perm?.granted) return <Text style={[S.dim, { textAlign: 'center' }]}>Allow camera access so Alice can see.</Text>;

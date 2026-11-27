@@ -30,6 +30,11 @@ export type Action =
   | { type: 'learn_word'; word: string }
   | { type: 'open_app'; name: string }
   | { type: 'self_check' }
+  | { type: 'explain' }
+  | { type: 'coach'; on: boolean; exercise?: string }
+  | { type: 'log_set'; exercise: string; reps: number; weight?: number }
+  | { type: 'workout_history'; days?: number }
+  | { type: 'foresight' }
   | { type: 'shop'; item: string; store?: string; fulfillment?: 'delivery' | 'pickup'; brand?: string }
   | { type: 'recall'; query: string; last?: number; who?: 'user' | 'assistant' | 'any' }
   | { type: 'make_file'; kind: 'word' | 'pdf' | 'excel' | 'powerpoint'; request: string; title?: string }
@@ -101,6 +106,11 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     }
     case 'recall': { const n = Number(a.last); const who = ['user', 'assistant', 'any'].includes(a.who) ? a.who : undefined; return { type: 'recall', query: str(a.query, 200) ?? '', ...(Number.isInteger(n) && n > 0 ? { last: Math.min(30, n) } : {}), ...(who ? { who } : {}) }; }
     case 'self_check': return { type: 'self_check' };
+    case 'explain': return { type: 'explain' };
+    case 'foresight': return { type: 'foresight' };
+    case 'coach': { const ex = str(a.exercise, 60); return { type: 'coach', on: a.on !== false && a.on !== 'false', ...(ex ? { exercise: ex } : {}) }; }
+    case 'log_set': { const ex = str(a.exercise, 60); const reps = Math.round(Number(a.reps)); const w = Number(a.weight); return ex && reps > 0 && reps < 500 ? { type: 'log_set', exercise: ex, reps, ...(w > 0 && w < 3000 ? { weight: w } : {}) } : null; }
+    case 'workout_history': { const d = Number(a.days); return { type: 'workout_history', ...(d > 0 && d <= 365 ? { days: Math.round(d) } : {}) }; }
     case 'shop': { const item = str(a.item, 120); const store = str(a.store, 40); const brand = str(a.brand, 60); const f = /pick/i.test(String(a.fulfillment ?? '')) ? 'pickup' : /deliver/i.test(String(a.fulfillment ?? '')) ? 'delivery' : undefined; return item ? { type: 'shop', item, ...(store ? { store } : {}), ...(f ? { fulfillment: f } : {}), ...(brand ? { brand } : {}) } : null; }
     case 'open_app': { const name = str(a.name, 60); return name ? { type: 'open_app', name } : null; }
     case 'learn_word': { const word = str(a.word, 40); return word ? { type: 'learn_word', word } : null; }
@@ -226,6 +236,11 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"set_mode","mode":"<mode id>"}
 {"type":"recall","query":"truck","last":3,"who":"user"}   search past conversations ("what did I tell you about…", "the last 3 things I sent you", "what did we talk about yesterday"); query optional when using last
 {"type":"shop","item":"dog food","store":"Walmart","fulfillment":"pickup","brand":"Blue Buffalo"}   "order me dog food from Walmart for pickup"; store/brand/fulfillment only if said (she remembers them)
+{"type":"explain"}   "why did you do that?", "what did you just do?"
+{"type":"coach","on":true,"exercise":"bench press"}   workout coach with the camera ("coach my bench", "watch my form"); on false to stop
+{"type":"log_set","exercise":"bench press","reps":8,"weight":185}   "log 8 reps at 185"
+{"type":"workout_history","days":7}   "how did I do this week?"
+{"type":"foresight"}   "anything coming up I should know about?", "what deadlines do I have?"
 {"type":"self_check"}   "fix yourself", "run a self-check", "something's wrong with you", "repair yourself"
 {"type":"open_app","name":"Spotify"}   "open Spotify / Instagram / my calendar / Uber"
 {"type":"make_file","kind":"word|pdf|excel|powerpoint","request":"exactly what the user wants, with every detail they gave","title":"optional"}

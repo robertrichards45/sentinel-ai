@@ -1,6 +1,8 @@
+import { coach, logSet, workoutHistory } from './coach';
+import { foresightText } from './foresight';
 import { shop } from './shop';
 import { selfCheck } from './selfRepair';
-import { recallText } from './convoLog';
+import { recallText, logTurn, recentActions } from './convoLog';
 import { openApp } from './apps';
 import { makeFile } from './makeFile';
 import { learnWord } from './vocab';
@@ -87,7 +89,21 @@ async function writableCalendar(): Promise<any> {
 const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString() : 'no time set');
 
 /** Runs one action. Returns a short sentence to speak about the outcome (truthful). */
+/** Every action Alice takes is logged (with what came of it), so "why did you do that?" has an answer. */
 export async function runAction(a: Action): Promise<string> {
+  let out: string;
+  try { out = await runActionInner(a); }
+  catch (e: any) { out = `Failed: ${e?.message ?? e}`; logAction(a, out); throw e; }
+  if (!['recall', 'explain', 'agenda', 'catch_up'].includes(a.type)) logAction(a, out);
+  return out;
+}
+function logAction(a: Action, result: string) {
+  const { type, ...rest } = a as any;
+  const args = Object.entries(rest).filter(([k]) => k !== 'content').map(([k, v]) => `${k}: ${String(v).slice(0, 60)}`).join(', ');
+  logTurn('assistant', `[action] ${type}${args ? ` (${args})` : ''} -> ${result.slice(0, 200)}`).catch(() => {});
+}
+
+async function runActionInner(a: Action): Promise<string> {
   switch (a.type) {
     case 'remember':
       if (!getSettings().memoryEnabled) return 'Memory is turned off in Settings, so I did not save that.';
@@ -239,6 +255,11 @@ export async function runAction(a: Action): Promise<string> {
     case 'self_check': return selfCheck();
     case 'shop': return shop(a.item, a.store, a.fulfillment, a.brand);
     case 'recall': return recallText(a.query, a.last, a.who);
+    case 'explain': return recentActions(8);
+    case 'coach': return coach(a.on, a.exercise);
+    case 'log_set': return logSet(a.exercise, a.reps, a.weight);
+    case 'workout_history': return workoutHistory(a.days ?? 7);
+    case 'foresight': return foresightText();
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
       if (!lastMade) return "There's nothing for me to undo.";

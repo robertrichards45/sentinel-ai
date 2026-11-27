@@ -4,6 +4,7 @@ import { parseDocReply, parseSheetsReply, parseSlidesReply } from '../src/makeFi
 import { recall, dateRange } from '../src/recallCore';
 import { appUrl } from '../src/appsCore';
 import { planOrder, storeLink } from '../src/shopCore';
+import { parseForesight } from '../src/foresightCore';
 import { NoiseGate } from '../src/liveCore';
 import { writeFileSync, mkdirSync } from 'fs';
 import { parsePhotoFiling } from '../src/photoCore';
@@ -368,6 +369,10 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   const sp2 = planOrder(sp.prefs, 'some dog food');
   check('shop remembers store, brand, pickup', sp2.query === 'Blue Buffalo dog food' && sp2.store === 'Walmart' && sp2.fulfillment === 'pickup' && sp2.usedSaved);
   check('walmart link', storeLink('walmart', 'dog food')?.url === 'https://www.walmart.com/search?q=dog%20food');
+  const fs = parseForesight('{"items":[{"title":"Car registration","date":"2026-12-15","why":"You said it expires mid December"},{"title":"Old","date":"2020-01-01","why":"x"},{"title":"Car registration","date":"2026-12-15","why":"dup"},{"title":"Bad","date":"soon"}]}', new Date(2026, 10, 26));
+  check('foresight keeps future, drops past/dupes/bad', fs.length === 1 && fs[0].title === 'Car registration', fs);
+  check('coach action', (validateAction({ type: 'coach', on: true, exercise: 'bench press' }, modes) as any)?.exercise === 'bench press');
+  check('log set action', (validateAction({ type: 'log_set', exercise: 'bench', reps: '8', weight: '185' }, modes) as any)?.weight === 185);
   check('make_file action', (validateAction({ type: 'make_file', kind: 'Excel spreadsheet', request: 'budget' }, modes) as any)?.kind === 'excel');
   check('recall action', (validateAction({ type: 'recall', last: 3, who: 'user' }, modes) as any)?.last === 3);
   check('offline open app', (parseOffline('open Spotify') as any)?.action?.name === 'Spotify');
