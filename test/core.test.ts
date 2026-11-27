@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
 import { markdownToDocx, sheetsToXlsx, slidesToPptx } from '../src/officeCore';
 import { parseDocReply, parseSheetsReply, parseSlidesReply } from '../src/makeFileCore';
@@ -6,6 +7,7 @@ import { appUrl } from '../src/appsCore';
 import { planOrder, storeLink } from '../src/shopCore';
 import { parseForesight } from '../src/foresightCore';
 import { parseMusicRequest } from '../src/musicCore';
+import { gmailText, buildRaw, describeList } from '../src/gmailCore';
 import { NoiseGate } from '../src/liveCore';
 import { writeFileSync, mkdirSync } from 'fs';
 import { parsePhotoFiling } from '../src/photoCore';
@@ -388,6 +390,18 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   const p4 = parseMusicRequest('shuffle my gym playlist'); check('music shuffle', p4.shuffle && p4.kind === 'playlist' && p4.term === 'shuffle gym'.replace('shuffle ', ''), p4);
   check('music control mapping', (validateAction({ type: 'music_control', command: 'skip' }, modes) as any)?.command === 'next');
   check('music control rejects junk', validateAction({ type: 'music_control', command: 'explode' }, modes) === null);
+}
+
+// --- 0.19: Gmail ---
+{
+  const b = (t: string) => Buffer.from(t).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+  const payload = { mimeType: 'multipart/alternative', parts: [{ mimeType: 'text/plain', body: { data: b('Hi Robert,\nSee you at 3.\n\nOn Tue, Nov 25, 2026 Kylee wrote:\n> earlier stuff') } }, { mimeType: 'text/html', body: { data: b('<p>x</p>') } }] };
+  check('gmail text strips quoted reply', gmailText(payload) === 'Hi Robert,\nSee you at 3.', gmailText(payload));
+  check('gmail html fallback', gmailText({ mimeType: 'text/html', body: { data: b('<p>Hello&nbsp;there</p>') } }) === 'Hello there');
+  const raw = buildRaw({ to: 'a@b.com', subject: 'Café plans', body: 'Hi', inReplyTo: '<x@y>' });
+  check('gmail raw headers', raw.includes('Subject: =?UTF-8?B?') && raw.includes('In-Reply-To: <x@y>') && raw.endsWith('\r\n\r\nHi'));
+  check('gmail list spoken', describeList([{ id: '1', threadId: 't', from: '"Kylee" <k@x.com>', subject: 'Saturday', date: '', snippet: '', messageId: '', unread: true }], true).startsWith('You have 1 new email: 1, from Kylee: Saturday'));
+  check('email_send needs body', validateAction({ type: 'email_send', to: 'Kylee' }, modes) === null);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

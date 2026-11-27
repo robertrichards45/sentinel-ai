@@ -15,6 +15,7 @@ import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
 import { connSecret, homeControl } from '../connections';
+import { connectGmail, disconnectGmail, gmailConnected, gmailConfigured } from '../gmail';
 import { showTour } from '../triggers';
 
 const STATUS_COLOR: Record<Status, string> = { tested: C.mint, built: C.violet, partial: C.amber, blocked: C.red, unsupported: C.sub, proposed: C.sub };
@@ -266,9 +267,17 @@ function Connections() {
   const [msg, setMsg] = useState('');
   const [hookName, setHookName] = useState('');
   const [hookUrl, setHookUrl] = useState('');
+  const [gmail, setGmail] = useState(false);
+  useEffect(() => { gmailConnected().then(setGmail); }, []);
   useEffect(() => { connSecret.get('ha-token').then((t) => setHasToken(!!t)); connSecret.get('ifttt-key').then((k) => setHasKey(!!k)); }, []);
   return (
     <Card title="Connections">
+      {gmailConfigured() ? (
+        <View style={{ gap: 8 }}>
+          <Text style={S.dim}>Gmail: Alice reads, searches, replies and archives by voice. Everything stays between your phone and Google; sending always needs your OK.</Text>
+          <Btn title={gmail ? 'Gmail connected — disconnect' : 'Connect Gmail'} kind={gmail ? 'ghost' : 'primary'} onPress={async () => { if (gmail) { await disconnectGmail(); setGmail(false); setMsg('Gmail disconnected.'); } else { const r = await connectGmail(); setMsg(r); setGmail(await gmailConnected()); } }} />
+        </View>
+      ) : null}
       <Text style={S.dim}>Home Assistant controls almost any smart-home device (lights, plugs, locks, thermostats, garage, TV, many cars). Paste its address (use the remote Nabu Casa address so it works away from home) and a long-lived access token (Home Assistant: your profile, Security, Long-lived access tokens).</Text>
       <Field label="Home Assistant address" value={s.homeAssistantUrl} onChange={(v) => updateSettings({ homeAssistantUrl: v.trim() })} placeholder="https://yourname.ui.nabu.casa" />
       <Field label={hasToken ? 'Access token (saved — paste to replace)' : 'Access token'} value={token} onChange={setToken} placeholder="eyJ…" secure />

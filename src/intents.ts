@@ -41,6 +41,11 @@ export type Action =
   | { type: 'capabilities' }
   | { type: 'whats_new' }
   | { type: 'music_control'; command: string }
+  | { type: 'email_check'; query?: string; count?: number }
+  | { type: 'email_read'; which?: string }
+  | { type: 'email_send'; to: string; subject: string; body: string }
+  | { type: 'email_reply'; body: string; which?: string }
+  | { type: 'email_archive'; which?: string }
   | { type: 'shop'; item: string; store?: string; fulfillment?: 'delivery' | 'pickup'; brand?: string }
   | { type: 'recall'; query: string; last?: number; who?: 'user' | 'assistant' | 'any' }
   | { type: 'make_file'; kind: 'word' | 'pdf' | 'excel' | 'powerpoint'; request: string; title?: string }
@@ -116,6 +121,11 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'foresight': return { type: 'foresight' };
     case 'capabilities': return { type: 'capabilities' };
     case 'whats_new': return { type: 'whats_new' };
+    case 'email_check': { const q = str(a.query, 200); const n = Number(a.count); return { type: 'email_check', ...(q ? { query: q } : {}), ...(n > 0 && n <= 10 ? { count: Math.round(n) } : {}) }; }
+    case 'email_read': { const w = str(String(a.which ?? ''), 80); return { type: 'email_read', ...(w ? { which: w } : {}) }; }
+    case 'email_send': { const to = str(a.to, 120), subject = str(a.subject, 200) ?? '', body = str(a.body, 5000); return to && body ? { type: 'email_send', to, subject, body } : null; }
+    case 'email_reply': { const body = str(a.body, 5000), w = str(String(a.which ?? ''), 80); return body ? { type: 'email_reply', body, ...(w ? { which: w } : {}) } : null; }
+    case 'email_archive': { const w = str(String(a.which ?? ''), 80); return { type: 'email_archive', ...(w ? { which: w } : {}) }; }
     case 'music_control': { const c = String(a.command ?? '').toLowerCase().replace(/[\s-]+/g, '_'); const map: Record<string, string> = { play: 'resume', unpause: 'resume', skip: 'next', next_song: 'next', back: 'previous', previous_song: 'previous', whats_playing: 'now_playing', what_is_playing: 'now_playing', shuffle: 'shuffle_on' }; const cmd = map[c] ?? c; return ['pause', 'resume', 'next', 'previous', 'restart', 'shuffle_on', 'shuffle_off', 'repeat_on', 'repeat_off', 'stop', 'now_playing'].includes(cmd) ? { type: 'music_control', command: cmd } : null; }
     case 'home_control': { const c = str(a.command, 300); return c ? { type: 'home_control', command: c } : null; }
     case 'ifttt': { const e = str(a.event, 60); const v = str(a.value, 300); return e ? { type: 'ifttt', event: e, ...(v ? { value: v } : {}) } : null; }
@@ -256,6 +266,11 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"ifttt","event":"start_car"}   fire an IFTTT applet by event name
 {"type":"webhook","name":"Morning routine"}   run one of the user's custom connections
 {"type":"music_control","command":"next"}   Apple Music: pause, resume, next, previous, restart, shuffle_on, shuffle_off, repeat_on, repeat_off, stop, now_playing ("what's playing?")
+{"type":"email_check","query":"from:kylee"}   Gmail: "any new emails?" (no query = unread), or a Gmail search
+{"type":"email_read","which":"2"}   read one from the last list ("read the second one", "read Kylee's")
+{"type":"email_reply","body":"..."}   reply to the email just read — ONLY after reading the reply back to the user and they say send
+{"type":"email_send","to":"Kylee","subject":"...","body":"..."}   new email — ONLY after the user confirms the exact text
+{"type":"email_archive","which":"that"}
 {"type":"whats_new"}   "what's new?", "what did they update?", "what can you do now?"
 {"type":"capabilities"}   "what can you do?", "what are your features?"
 {"type":"foresight"}   "anything coming up I should know about?", "what deadlines do I have?"

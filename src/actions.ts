@@ -1,4 +1,5 @@
 import { musicControl } from './music';
+import { checkEmail, readEmail, sendEmail, replyEmail, archiveEmail } from './gmail';
 import { briefingHooks } from './briefingHooks';
 import { runForesight } from './foresight';
 import { whatsNewText, markNewsTold } from './whatsNew';
@@ -278,6 +279,11 @@ async function runActionInner(a: Action): Promise<string> {
     case 'webhook': return runWebhook(a.name, a.value);
     case 'capabilities': return CAPABILITIES_SPOKEN;
     case 'music_control': return musicControl(a.command);
+    case 'email_check': return checkEmail(a.query, a.count);
+    case 'email_read': return readEmail(a.which);
+    case 'email_send': return sendEmail(a.to, a.subject, a.body);
+    case 'email_reply': return replyEmail(a.body, a.which);
+    case 'email_archive': return archiveEmail(a.which);
     case 'whats_new': { const t = whatsNewText(); markNewsTold(); return t; }
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
