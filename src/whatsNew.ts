@@ -8,6 +8,10 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.19.2', date: '2026-11-27', items: [
+    'Fixed the big one: my abilities, instructions and your chosen voice were being ignored in conversations. Calls, self-check, memory, weather and everything else now work by voice',
+    'Every build is now tested against my real AI with 34 everyday requests before it reaches you',
+  ] },
   { version: '0.19.0', date: '2026-11-27', items: [
     'If I ever say I can\'t remember our past conversations, or slip into Spanish, I catch it and correct myself right away',
     'Hey Alice is steadier in the background',

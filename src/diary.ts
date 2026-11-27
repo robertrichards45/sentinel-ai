@@ -4,6 +4,7 @@
  * what you or Alice said. Kept on the phone (last 3000 events) and, unless Privacy mode is on, sent every few
  * minutes to Alice's own server, where it shows up in the server log.
  */
+import { AppState } from 'react-native';
 import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
@@ -64,3 +65,10 @@ setTimeout(upload, 30000);
 
 /** Save now and send soon (used when the user reports a problem). */
 export const flushDiary = () => { dirty = true; save(); setTimeout(upload, 2000); };
+
+// Background diagnostics: record when Alice goes to the background and back, and send the log right away
+// when she leaves the screen (iOS may suspend her before the next 4-minute upload).
+AppState.addEventListener('change', (st) => {
+  note(st === 'active' ? 'app-foreground' : 'app-background', { state: st });
+  if (st !== 'active') { dirty = true; save(); upload(); }
+});

@@ -327,6 +327,7 @@ class LiveSession {
       } catch {}
     }
     if (sc.turnComplete) {
+      this.toolsThisTurn = {};
       this.turnDone = true;
       if (this.muted) { this.muted = false; this.aliceBuf = ''; }
       this.flushYou(); this.flushAlice();
@@ -341,6 +342,7 @@ class LiveSession {
    *  - she drifts into Spanish (noise misheard as Spanish) → stop, and tell her to answer in English
    */
   private corrected = 0;
+  private toolsThisTurn: Record<string, number> = {};
   private guard() {
     const t = this.aliceBuf;
     if (Date.now() - this.corrected < 15000 || t.length < 25) return;
@@ -364,6 +366,13 @@ class LiveSession {
     const functionResponses = [];
     const saidRecently = [this.youBuf, ...this.lines.filter((l) => l.who === 'you').slice(0, 2).map((l) => l.text)].join(' ');
     for (const c of calls) {
+      // Loop guard (the live stress test caught her calling look_up 57 times for one question).
+      this.toolsThisTurn[c.name] = (this.toolsThisTurn[c.name] ?? 0) + 1;
+      if (this.toolsThisTurn[c.name] > 3) {
+        if (this.toolsThisTurn[c.name] === 4) note('tool-loop', { tool: c.name });
+        functionResponses.push({ id: c.id, name: c.name, response: { result: 'Stop calling tools now. Answer the user with what you already have.' } });
+        continue;
+      }
       // Only switch to the interpreter when the user actually asked for translation.
       const toTranslator = (c.name === 'translator' && c.args?.on) || (c.name === 'set_mode' && c.args?.mode === 'translator');
       if (toTranslator && !/translat|interpret|in (spanish|french|german|italian|portuguese|chinese|japanese|korean|arabic|russian|hindi|vietnamese|tagalog)|speak (spanish|french|german)/i.test(saidRecently)) {

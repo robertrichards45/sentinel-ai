@@ -24,8 +24,18 @@ jobs:
       - run: npx tsx test/core.test.ts
         env: { G2_FIXTURES: test/fixtures }
 
+  live:
+    # Alice's real voice brain, end to end: 34 everyday requests must use the right ability (>= 90%).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node test/live/extract-tools.mjs
+      - run: node test/live/live-e2e.mjs app
+
   ios:
-    needs: test
+    needs: [test, live]
     runs-on: macos-26
     timeout-minutes: 60
     steps:

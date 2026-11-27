@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 /**
  * "Hey Alice" wake word, without Siri. Uses Apple's on-device speech recognition (free, private, nothing
  * leaves the phone until Alice actually wakes). It listens with the PHONE's microphone while Alice is open
@@ -35,6 +36,7 @@ const aliceBusy = () => isDeepAsleep() || speaking || appMicBusy() || glassesVoi
 function start() {
   if (running || !enabled || aliceBusy() || Date.now() < pauseUntil) return;
   running = true; startedAt = Date.now();
+  if (AppState.currentState !== 'active') note('wake-start-bg', {});
   try {
     ExpoSpeechRecognitionModule.start({
       lang: 'en-US',
