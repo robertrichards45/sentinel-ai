@@ -3,6 +3,8 @@ import { whenSleeping, goToSleep } from './quiet';
 
 /** Phrases that end the conversation immediately, whatever the AI makes of them. */
 export const STOP_WORDS = /\b(stop listening|stop listening to me|go to sleep|that'?s all(?: for now)?|good ?bye,? alice|bye,? alice|alice,? stop|be quiet|quit listening|you can stop|stop the conversation|end the conversation)\b/i;
+/** Of those, the ones that also turn "Hey Alice" off until you wake her by hand. */
+export const DEEP_STOP_WORDS = /\b(stop listening|stop listening to me|go to sleep|be quiet|quit listening)\b/i;
 import { setLiveRestarter } from './liveRestart';
 import { setPhoneMic } from './micState';
 /**
@@ -311,7 +313,7 @@ class LiveSession {
       this.youBuf += sc.inputTranscription.text;
       if (this.state === 'listening') this.set('thinking');
       // "Stop listening" is handled right here, not left to the AI (which once heard it as a request to translate).
-      if (this.role === 'chat' && STOP_WORDS.test(this.youBuf)) { note('stop-words', {}); this.flushYou(); goToSleep(); this.stop(); return; }
+      if (this.role === 'chat' && STOP_WORDS.test(this.youBuf)) { const deep = DEEP_STOP_WORDS.test(this.youBuf); note('stop-words', { deep }); this.flushYou(); goToSleep(deep); this.stop(); return; }
     }
     if (sc.outputTranscription?.text) { this.aliceBuf += sc.outputTranscription.text; if (this.role === 'chat') this.guard(); }
     for (const p of sc.modelTurn?.parts ?? []) {

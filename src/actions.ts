@@ -297,8 +297,8 @@ async function runActionInner(a: Action): Promise<string> {
     case 'scan_doc': return scanDocument();
     case 'photo_file': return photoToPlanner(a.target, !!a.fromLibrary, (x) => { const v = validateAction(x, []); return v ? runAction(v as Action) : Promise.resolve('That did not work.'); });
     case 'stop_listening': {
-      setTimeout(goToSleep, 1500); // after she says goodbye
-      return 'Okay, I\'ll stop listening.';
+      setTimeout(() => goToSleep(true), 1500); // after she says goodbye; Hey Alice pauses too
+      return 'Okay, I\'ll stop listening. Tap me or press your glasses button when you need me.';
     }
     case 'report_problem': {
       note('user-report', { text: a.text });

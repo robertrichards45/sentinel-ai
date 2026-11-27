@@ -10,8 +10,8 @@ import { getSettings, onSettings } from './settings';
 import { appMicBusy } from './micState';
 import { onSpeaking } from './voice';
 import { live } from './live';
-// (The silent keep-alive player was removed in 0.18.3: the log showed it interrupting Hey Alice's microphone.
-// On-device continuous recognition keeps the mic, and the app, running in the background by itself.)
+import { wakeInterrupted, updateKeepAlive, setLiveCheck, off as keepAliveOff } from './keepAlive';
+import { isDeepAsleep, whenSleeping, whenWoken } from './quiet';
 import { glassesVoiceActive } from './glassesVoice';
 import { wake } from './triggers';
 import { note } from './diary';
@@ -30,7 +30,7 @@ let quickFails = 0;
 let pauseUntil = 0;
 onSpeaking((on) => { speaking = on; });
 
-const aliceBusy = () => speaking || appMicBusy() || glassesVoiceActive() || (live.state !== 'off' && live.state !== 'error');
+const aliceBusy = () => isDeepAsleep() || speaking || appMicBusy() || glassesVoiceActive() || (live.state !== 'off' && live.state !== 'error');
 
 function start() {
   if (running || !enabled || aliceBusy() || Date.now() < pauseUntil) return;
@@ -74,7 +74,7 @@ function ended() {
   setTimeout(() => { if (enabled && !aliceBusy()) start(); }, 200);
 }
 ExpoSpeechRecognitionModule.addListener('end', ended);
-ExpoSpeechRecognitionModule.addListener('error', (e: any) => { ended(); if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });
+ExpoSpeechRecognitionModule.addListener('error', (e: any) => { if (e?.error === 'interrupted') wakeInterrupted(); ended(); if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });
 
 async function setEnabled(on: boolean) {
   if (on === enabled) return;
@@ -97,3 +97,8 @@ export const wakeWordReady = () => setEnabled(!!getSettings().heyAlice);
 /** For self-repair: is "Hey Alice" supposed to be on, and has it been idle (not listening) too long? */
 export const wakeWordHealth = () => ({ enabled, running, idleMs: running ? 0 : Date.now() - startedAt, busy: aliceBusy(), paused: Date.now() < pauseUntil });
 export function restartWakeWord() { stop(); pauseUntil = 0; quickFails = 0; setTimeout(() => { if (enabled && !aliceBusy()) start(); }, 300); }
+
+// "Stop listening": mic fully off (orange dot goes away) until you wake her; then Hey Alice comes back.
+whenSleeping(() => { if (isDeepAsleep()) { stop(); keepAliveOff(); note('wake-paused-by-user', {}); } });
+whenWoken(() => { setTimeout(() => { if (enabled && !aliceBusy()) start(); updateKeepAlive(); }, 500); });
+setLiveCheck(() => live.state !== 'off' && live.state !== 'error');

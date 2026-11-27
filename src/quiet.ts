@@ -5,11 +5,21 @@
  */
 type Fn = () => void;
 let asleep = false;
+let deep = false; // "stop listening": Hey Alice is paused too, until you wake her yourself
 const onSleep = new Set<Fn>();
+const onWakeUp = new Set<Fn>();
 export const isAsleep = () => asleep;
-export const wakeUp = () => { asleep = false; };
+export const isDeepAsleep = () => deep;
+export const wakeUp = () => { const was = deep; asleep = false; deep = false; if (was) onWakeUp.forEach((f) => { try { f(); } catch {} }); };
 export const whenSleeping = (fn: Fn) => { onSleep.add(fn); return () => { onSleep.delete(fn); }; };
-export function goToSleep() {
+export const whenWoken = (fn: Fn) => { onWakeUp.add(fn); return () => { onWakeUp.delete(fn); }; };
+/**
+ * deep = true for "stop listening" / "go to sleep" / "be quiet": the microphone goes fully off, including
+ * "Hey Alice", until you tap the orb or press the glasses button. "That's all" / "bye Alice" just ends the
+ * conversation and leaves "Hey Alice" on.
+ */
+export function goToSleep(isDeep = false) {
   asleep = true;
+  if (isDeep) deep = true;
   onSleep.forEach((f) => { try { f(); } catch {} });
 }
