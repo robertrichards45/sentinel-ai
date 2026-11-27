@@ -9,6 +9,8 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
 import { onListenRequest } from '../triggers';
+import { offlineNow, checkNet } from '../netState';
+import { offlineTurn } from '../offline';
 import { live, LiveState, LiveLine } from '../live';
 import { onGlassesVoice } from '../glassesVoice';
 import { updateSettings } from '../settings';
@@ -63,6 +65,7 @@ export default function Assist() {
   const toggleLive = async () => {
     if (liveOn) { goToSleep(); await live.stop(); return; }
     wakeUp();
+    if (offlineNow() || !(await checkNet())) { offlineTurn(); return; } // no signal: basics only
     stopSpeaking(); setErr(''); setLiveNote('');
     await live.start();
   };
@@ -111,7 +114,7 @@ export default function Assist() {
   const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
   const [look, setLook] = useState(false);
   useEffect(() => onLook((on) => setLook(on)), []);
-  useEffect(() => onListenRequest(() => (s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
+  useEffect(() => onListenRequest(() => (offlineNow() ? offlineTurn() : s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
 
   const start = async (fromHandsFree = false) => {
     if (!fromHandsFree) { pressedAt.current = Date.now(); handsFreeRef.current = false; }

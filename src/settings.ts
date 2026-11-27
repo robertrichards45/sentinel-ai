@@ -22,6 +22,8 @@ export type Settings = {
   modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
   glassesModel: '' | 'g2' | 'headphones' | 'meta' | 'none'; // '' = not chosen yet (first-launch setup)
   dailyHeadsUp: boolean; // first time the glasses connect each day, Alice tells you what's on today
+  shortcuts: string[]; // Siri Shortcut names Alice may run
+  emergencyContacts: string[]; // names from Contacts, or phone numbers
   heyAlice: boolean; // listen for "Hey Alice" (on-device, phone mic, while Alice is open or in the background)
   glassesConversation: boolean; // hands-free back-and-forth through the glasses mic (official app's commands)
   glassesAudio: boolean; // headset mode: glasses connect as Bluetooth headphones so Alice is heard through them
@@ -52,6 +54,8 @@ export const DEFAULTS: Settings = {
   liveConversation: true,
   glassesModel: '',
   dailyHeadsUp: true,
+  shortcuts: [],
+  emergencyContacts: [],
   heyAlice: false,
   glassesConversation: false, // off until Robert approves the commands
   glassesAudio: false, // off until Robert approves the command

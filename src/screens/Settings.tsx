@@ -152,6 +152,16 @@ export default function Settings() {
         </View>
       </Card>
 
+      <Card title="Siri Shortcuts">
+        <Text style={S.dim}>Type the exact names of Shortcuts you want Alice to run (smart-home lights, thermostat, scenes, anything in the Shortcuts app). Then say "Alice, lights off".</Text>
+        <NameList items={s.shortcuts ?? []} onChange={(v) => updateSettings({ shortcuts: v })} placeholder="e.g. Lights Off" />
+      </Card>
+
+      <Card title="Emergency help">
+        <Text style={S.dim}>Say "Alice, I need help" and she gets a text with your location ready for these people (you tap Send), then offers to call 911. Use names from your Contacts or phone numbers.</Text>
+        <NameList items={s.emergencyContacts ?? []} onChange={(v) => updateSettings({ emergencyContacts: v })} placeholder="e.g. Mom or 555-123-4567" />
+      </Card>
+
       <Card title="Behaviour">
         <Toggle label="Confirm before reminders, events, navigation" value={s.confirmActions} onChange={(v) => updateSettings({ confirmActions: v })} />
         <View style={S.row}>
@@ -195,5 +205,22 @@ function Chip({ on, label, onPress }: { on: boolean; label: string; onPress: () 
     <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={label}>
       {on ? <View style={{ borderRadius: 999, backgroundColor: C.violet }}>{t}</View> : <Glass radius={999}>{t}</Glass>}
     </Pressable>
+  );
+}
+
+/** Small add/remove list for names (shortcuts, emergency contacts). */
+function NameList({ items, onChange, placeholder }: { items: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [v, setV] = useState('');
+  return (
+    <View style={{ gap: 8 }}>
+      {items.map((it) => (
+        <View key={it} style={[S.row, { justifyContent: 'space-between' }]}>
+          <Text style={[S.body, { flex: 1 }]}>{it}</Text>
+          <Btn kind="ghost" title="✕" onPress={() => onChange(items.filter((x) => x !== it))} />
+        </View>
+      ))}
+      <Field label="Add" value={v} onChange={setV} placeholder={placeholder} />
+      <Btn title="Add" disabled={!v.trim() || items.includes(v.trim())} onPress={() => { onChange([...items, v.trim()].slice(0, 30)); setV(''); }} />
+    </View>
   );
 }

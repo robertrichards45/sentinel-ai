@@ -31,6 +31,8 @@ import './src/headsUp';
 import './src/learn';
 import './src/navigation'; // registers the background directions task at startup
 import { ActivityBanner } from './src/ActivityBanner';
+import { setHealthUrl, checkNet } from './src/netState';
+import { healthUrl } from './src/ai';
 import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
@@ -85,6 +87,7 @@ function Shell() {
   useEffect(() => {
     (async () => {
       await Promise.all([loadSettings(), memory.load(), loadModes()]);
+      setHealthUrl(healthUrl()); checkNet();
       setNeedsSetup(!getSettings().glassesModel);
       setReady(true);
       if (getSettings().glassesModel) {

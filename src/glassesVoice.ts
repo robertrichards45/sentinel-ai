@@ -15,6 +15,8 @@ import { opusToOgg } from './oggOpus';
 import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
 import { takingNotes, currentMeeting, stopNotes } from './meetingNotes';
+import { offlineNow } from './netState';
+import { offlineTurn } from './offline';
 import { live, liveReady } from './live';
 import { streamStart, streamFrames, streamEnd, streaming } from './glassesStream';
 import { getSettings } from './settings';
@@ -165,6 +167,12 @@ glasses.on((e: any) => {
   if (e.kind === 'busy' && e.on && (live.state === 'speaking' || speaking)) {
     note('cut-off', { by: 'glasses-button' });
     live.cutOff(); stopSpeaking(); wakeUp();
+    return;
+  }
+  // No signal: the glasses button still works for the basics (on-device listening, iPhone voice).
+  if (e.kind === 'busy' && e.on && drive() && !session && !recording && !processing && offlineNow()) {
+    wakeUp(); note('offline-button', {});
+    cmd('ackButton').finally(() => offlineTurn());
     return;
   }
   if (e.kind === 'busy' && e.on && drive() && !session && !recording && !processing) {

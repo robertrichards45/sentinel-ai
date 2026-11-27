@@ -1,3 +1,4 @@
+import { checkNet } from './netState';
 import { note, setDiarySender } from './diary';
 import { File } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
@@ -18,6 +19,7 @@ export type Source = { title: string; url: string };
 export type AIAnswer = { heard?: string; text: string; provider: string; model: string; ms: number; sources: Source[]; costUsd: number | null };
 
 const server = () => (getSettings().serverUrl || DEFAULT_SERVER).replace(/\/+$/, '');
+export const healthUrl = () => server() + '/health';
 
 async function register(): Promise<string> {
   let id = await secret.get(INSTALL);
@@ -47,6 +49,7 @@ async function call(path: string, body: unknown, timeoutMs = 60000, retried = fa
     return j;
   } catch (e: any) {
     if (path !== '/v1/diag') note('ai-error', { path, msg: String(e?.message ?? e), ms: Date.now() - t0 });
+    if (!(e instanceof AIError)) checkNet(); // network-level failure: are we offline?
     if (e?.name === 'AbortError') throw new AIError('Alice took too long to answer. Check your connection and try again.');
     if (e instanceof AIError) throw e;
     throw new AIError("Couldn't reach Alice's server. Check your internet connection.");

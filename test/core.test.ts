@@ -1,4 +1,6 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
+import { parseOffline, parseDuration, parseClock } from '../src/offlineCore';
+import { pickShortcut, listMatches } from '../src/matchCore';
 import { stepsFromOsrm, newNav, navUpdate, sayDistance, stepText, overview, metersBetween } from '../src/navCore';
 import { parseLearned, parseLearnedUpdate, overlap } from '../src/memoryCore';
 // Unit tests for the pure modules, using the REAL files backed up from the glasses.
@@ -245,6 +247,39 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   off = navUpdate(off, { lat: 40.008, lon: -80 }).state;
   check('off route detected', !!navUpdate(off, { lat: 40.008, lon: -80.003 }).reroute);
   check('haversine ~111 m per 0.001 deg lat', Math.abs(metersBetween({ lat: 40, lon: -80 }, { lat: 40.001, lon: -80 }) - 111) < 1);
+}
+
+// --- 0.12.0: shortcuts, lists, emergency, offline ---
+{
+  check('shortcut exact', pickShortcut('lights off', ['Lights Off', 'Movie Time']) === 'Lights Off');
+  check('shortcut fuzzy', pickShortcut('turn the lights off', ['Lights Off', 'Movie Time']) === 'Lights Off');
+  check('shortcut unknown kept', pickShortcut('Garage', ['Lights Off']) === 'Garage');
+  check('list alias groceries', listMatches('Groceries', 'shopping'));
+  check('list name match', listMatches('Shopping', 'my shopping list'));
+  check('list no false match', !listMatches('Work', 'shopping'));
+  check('list_add action', (validateAction({ type: 'list_add', list: 'shopping', items: ['milk', 'eggs'] }, modes) as any)?.items.length === 2);
+  check('list_add string items', (validateAction({ type: 'list_add', list: 'shopping', items: 'milk, eggs and bread' }, modes) as any)?.items.length === 3);
+  check('emergency action', (validateAction({ type: 'emergency' }, modes) as any)?.type === 'emergency');
+  check('duration 5 min', parseDuration('set a timer for 5 minutes') === 300);
+  check('duration words', parseDuration('timer for an hour and 20 minutes') === 4800);
+  check('duration half', parseDuration('two and a half minutes timer') === 150, parseDuration('two and a half minutes timer'));
+  const now = new Date(2026, 10, 26, 20, 0);
+  const c1 = parseClock('7 am', now)!; check('clock 7am tomorrow', c1.getDate() === 27 && c1.getHours() === 7);
+  const c2 = parseClock('9:30', now)!; check('clock 9:30 tonight', c2.getDate() === 26 && c2.getHours() === 21 && c2.getMinutes() === 30, c2.toString());
+  const o = (t: string) => parseOffline(t, ['Lights Off'], now) as any;
+  check('offline timer', o('Hey Alice set a timer for 10 minutes')?.action?.seconds === 600);
+  check('offline alarm', o('wake me up at 6:15 am')?.action?.type === 'alarm');
+  check('offline time', /^It's \d/.test(o('what time is it')?.say ?? ''));
+  check('offline list add', o('add milk and eggs to my shopping list')?.action?.items?.length === 2);
+  check('offline list read', o("what's on my shopping list")?.action?.list === 'shopping', o("what's on my shopping list"));
+  check('offline check off', o('check off milk from my shopping list')?.action?.item === 'milk');
+  check('offline parked', o('where did I park')?.action?.type === 'find_spot');
+  check('offline call', o('call mom')?.action?.who === 'mom');
+  check('offline text', o('text Sarah saying running late')?.action?.body === 'running late');
+  check('offline note', o('take a note buy oil filter')?.action?.text === 'buy oil filter');
+  check('offline help', o('I need help')?.action?.type === 'emergency');
+  check('offline shortcut by name', o('lights off')?.action?.name === 'Lights Off');
+  check('offline unknown', o('who won the game last night') === null);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

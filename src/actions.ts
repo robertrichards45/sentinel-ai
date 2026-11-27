@@ -1,3 +1,6 @@
+import { runShortcut } from './shortcutsRun';
+import { addToList, readList, checkOff } from './lists';
+import { emergencyText, call911 } from './emergency';
 import { startNotes, stopNotes } from './meetingNotes';
 import { startDirections, stopDirections } from './navigation';
 import { resolvePlace, driveMinutes } from './places';
@@ -184,6 +187,12 @@ export async function runAction(a: Action): Promise<string> {
     case 'take_notes': return a.action === 'stop' ? stopNotes() : startNotes(a.title);
     case 'directions': return startDirections(a.to, a.mode);
     case 'stop_directions': return stopDirections();
+    case 'run_shortcut': return runShortcut(a.name);
+    case 'list_add': return addToList(a.list, a.items);
+    case 'list_read': return readList(a.list);
+    case 'list_check': return checkOff(a.list, a.item);
+    case 'emergency': return emergencyText();
+    case 'call_911': return call911();
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye
       return 'Okay, I\'ll stop listening.';

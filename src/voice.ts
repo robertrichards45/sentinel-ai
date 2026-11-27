@@ -1,3 +1,4 @@
+import { offlineNow } from './netState';
 import * as Speech from 'expo-speech';
 import { AudioRecorder, AudioPlayer, createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
@@ -169,7 +170,7 @@ export function speak(text: string, language?: string, modeId?: string): Promise
   const run = async () => {
     await enablePlaybackSession();
     if (gen !== generation) return;
-    if (voice !== 'iphone' && !s.privacyMode) {
+    if (voice !== 'iphone' && !s.privacyMode && !offlineNow()) {
       const style = styleFor(s.voiceStyle, s.speechRate, s.voicePitch);
       const [first, rest] = splitForSpeech(text.slice(0, 3000));
       // Voice both parts at once; play the first as soon as it's ready.

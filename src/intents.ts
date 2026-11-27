@@ -14,6 +14,12 @@ export type Action =
   | { type: 'take_notes'; action: 'start' | 'stop'; title?: string }
   | { type: 'directions'; to: string; mode: 'driving' | 'walking' }
   | { type: 'stop_directions' }
+  | { type: 'run_shortcut'; name: string }
+  | { type: 'list_add'; list: string; items: string[] }
+  | { type: 'list_read'; list: string }
+  | { type: 'list_check'; list: string; item: string }
+  | { type: 'emergency' }
+  | { type: 'call_911' }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
@@ -54,6 +60,17 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'take_notes': { const title = str(a.title, 80); return { type: 'take_notes', action: a.action === 'stop' ? 'stop' : 'start', ...(title ? { title } : {}) }; }
     case 'directions': { const to = str(a.to, 200); return to ? { type: 'directions', to, mode: /walk|foot/i.test(String(a.mode ?? '')) ? 'walking' : 'driving' } : null; }
     case 'stop_directions': return { type: 'stop_directions' };
+    case 'run_shortcut': { const name = str(a.name, 100); return name ? { type: 'run_shortcut', name } : null; }
+    case 'list_add': {
+      const list = str(a.list, 60) || 'shopping';
+      const raw = Array.isArray(a.items) ? a.items : typeof a.items === 'string' ? String(a.items).split(/,| and /) : [];
+      const items = raw.map((x: unknown) => str(x, 120)).filter(Boolean).slice(0, 30) as string[];
+      return items.length ? { type: 'list_add', list, items } : null;
+    }
+    case 'list_read': return { type: 'list_read', list: str(a.list, 60) || 'shopping' };
+    case 'list_check': { const item = str(a.item, 120); return item ? { type: 'list_check', list: str(a.list, 60) || 'shopping', item } : null; }
+    case 'emergency': return { type: 'emergency' };
+    case 'call_911': return { type: 'call_911' };
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
     case 'reminder': {
@@ -138,6 +155,10 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"take_notes","action":"start","title":"Budget meeting"}   "take notes", "record this meeting"; action "stop" for "stop taking notes"
 {"type":"directions","to":"Starbucks","mode":"walking"}   turn-by-turn spoken directions; mode driving (default) or walking
 {"type":"stop_directions"}   "stop directions", "cancel navigation"
+{"type":"run_shortcut","name":"Lights Off"}   runs one of the user's Siri Shortcuts (smart home, other apps)
+{"type":"list_add","list":"shopping","items":["milk","eggs"]}   also list_read {"list"} and list_check {"list","item"}
+{"type":"emergency"}   the user needs help or is in danger; then ask about 911
+{"type":"call_911"}   ONLY after the user says yes to calling 911
 {"type":"note","text":"..."}
 {"type":"reminder","title":"...","due":"2026-11-26T09:00:00-05:00"}
 {"type":"event","place":"optional address or place name; adds a time-to-leave alert","title":"...","start":"...","durationMin":60}

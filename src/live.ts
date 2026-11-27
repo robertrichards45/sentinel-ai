@@ -45,6 +45,12 @@ const TOOLS = [
   { name: 'take_notes', description: 'Meeting notes. action start: Alice goes quiet, records and transcribes the meeting; stop: writes summary, decisions and action items. Say the result back.', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING', enum: ['start', 'stop'] }, title: { type: 'STRING' } }, required: ['action'] } },
   { name: 'directions', description: 'Spoken turn-by-turn directions through the glasses. to: address or place; mode: driving or walking. Read back the overview it returns.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, mode: { type: 'STRING', enum: ['driving', 'walking'] } }, required: ['to'] } },
   { name: 'stop_directions', description: 'Stop turn-by-turn directions.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'run_shortcut', description: 'Run one of the user\'s Siri Shortcuts by name (e.g. smart-home lights, thermostat, scenes).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'list_add', description: 'Add items to a list in iPhone Reminders (shopping, to-do, any name; created if missing).', parameters: { type: 'OBJECT', properties: { list: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['list', 'items'] } },
+  { name: 'list_read', description: 'Read what is on a list.', parameters: { type: 'OBJECT', properties: { list: { type: 'STRING' } }, required: ['list'] } },
+  { name: 'list_check', description: 'Check off / remove an item from a list.', parameters: { type: 'OBJECT', properties: { list: { type: 'STRING' }, item: { type: 'STRING' } }, required: ['list', 'item'] } },
+  { name: 'emergency', description: 'User needs help: prepares a text with their location to their emergency contacts.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'call_911', description: 'Call 911. ONLY after the user clearly says yes to calling 911.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'call', description: 'Phone call to a contact ("call Mom").', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' } }, required: ['who'] } },
   { name: 'text', description: 'Text message to a contact; opens Messages filled in.', parameters: { type: 'OBJECT', properties: { who: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['who', 'body'] } },
   { name: 'timer', description: 'Countdown timer in seconds, optional label.', parameters: { type: 'OBJECT', properties: { seconds: { type: 'NUMBER' }, label: { type: 'STRING' } }, required: ['seconds'] } },
@@ -156,6 +162,8 @@ class LiveSession {
       'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
+      (s.shortcuts ?? []).length ? `The user's Siri Shortcuts you can run with run_shortcut (lights, thermostat, scenes and more): ${s.shortcuts.join(', ')}. Match what they ask to the closest one.` : 'The run_shortcut tool runs any Siri Shortcut by name (smart home and other apps).',
+      'If the user says they need help, are hurt, in danger or it is an emergency, call the emergency tool at once, then ask if they want 911. Only call call_911 after they say yes.',
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
     ].filter(Boolean).join('\n\n');
     return { setup: {
