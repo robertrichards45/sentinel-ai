@@ -100,6 +100,7 @@ const TOOLS = [
   { name: 'email_archive', description: 'Archive an email from the last list (which = number, sender or "that").', parameters: { type: 'OBJECT', properties: { which: { type: 'STRING' } } } },
   { name: 'whats_new', description: 'What changed in Alice\'s latest update ("what\'s new?").', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'capabilities', description: 'What Alice can do (a short spoken overview). Use for "what can you do?".', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'health_summary', description: 'Apple Health: last night\'s sleep, steps and active calories today, resting heart rate, HRV, workouts this week. Use it to tailor workout intensity and advice (general guidance, not medical).', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'foresight', description: 'Upcoming deadlines, renewals and dates found in the user\'s notes, meetings and conversations that are not on the calendar yet. Offer to add reminders.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'self_check', description: 'Run a self-check and repair ("fix yourself", "something is wrong with you"): permissions, server, glasses, wake word. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'open_app', description: 'Open an app on the iPhone by name (Spotify, Instagram, Uber, Calendar, Settings...).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },

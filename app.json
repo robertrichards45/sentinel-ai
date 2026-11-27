@@ -134,6 +134,14 @@
           "microphonePermission": "Alice listens for you to talk to her.",
           "recordAudioAndroid": false
         }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Alice reads your sleep, steps, heart rate and workouts when you ask, to tailor workouts and advice. Nothing is written to Health.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
       ]
     ],
     "scheme": "alice"

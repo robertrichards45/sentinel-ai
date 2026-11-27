@@ -1,3 +1,4 @@
+import { healthSummary } from './health';
 import { musicControl } from './music';
 import { checkEmail, readEmail, sendEmail, replyEmail, archiveEmail } from './gmail';
 import { briefingHooks } from './briefingHooks';
@@ -274,6 +275,7 @@ async function runActionInner(a: Action): Promise<string> {
     case 'log_set': return logSet(a.exercise, a.reps, a.weight);
     case 'workout_history': return workoutHistory(a.days ?? 7);
     case 'foresight': return foresightText();
+    case 'health_summary': return healthSummary();
     case 'home_control': return homeControl(a.command);
     case 'ifttt': return iftttTrigger(a.event, a.value);
     case 'webhook': return runWebhook(a.name, a.value);
