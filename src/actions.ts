@@ -1,9 +1,6 @@
-<<<<<<< HEAD
 import { healthSummary } from './health';
-=======
 import { briefingHooks } from './briefingHooks';
 import { runForesight } from './foresight';
->>>>>>> main
 import { whatsNewText, markNewsTold } from './whatsNew';
 import { homeControl, iftttTrigger, runWebhook } from './connections';
 import { CAPABILITIES_SPOKEN } from './capabilities';
