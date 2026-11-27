@@ -94,13 +94,13 @@ export function findAudio(j) {
 // Short-lived token for a real-time (Live API) session. The phone uses it instead of the API key.
 // Locked to the Live model and audio output; valid to START a session for 2 min, usable for 30 min
 // (session resumption may reconnect with the same token inside that window).
-export async function liveToken() {
+export async function liveToken({ unlocked = false } = {}) {
   const now = Date.now();
   const times = { uses: 1, expireTime: new Date(now + 30 * 60000).toISOString(), newSessionExpireTime: new Date(now + 2 * 60000).toISOString() };
   const setup = { model: `models/${config.live.model}`, generationConfig: { responseModalities: ['AUDIO'] }, sessionResumption: {} };
   // Raw REST names the constraint "bidiGenerateContentSetup" (the SDKs call it liveConnectConstraints).
   // Try the documented variants in order and remember which API version issued the token.
-  const attempts = [
+  const attempts = unlocked ? [['v1alpha', times], ['v1beta', times]] : [
     ['v1alpha', { ...times, bidiGenerateContentSetup: setup }],
     ['v1beta', { ...times, bidiGenerateContentSetup: setup }],
     ['v1alpha', times],

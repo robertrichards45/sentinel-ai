@@ -1,0 +1,1007 @@
+[
+ {
+  "name": "remember",
+  "description": "Save a lasting fact about the user: ALWAYS call it when they tell you something about themselves worth knowing later (their car, family, job, home, likes, plans, preferences) or say remember. Write it as a short standalone sentence, e.g. \"Drives a 2021 Dodge Charger\".",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "fact": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "fact"
+   ]
+  }
+ },
+ {
+  "name": "reminder",
+  "description": "Create an iPhone reminder. due is ISO 8601 with the user UTC offset.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "title": {
+     "type": "STRING"
+    },
+    "due": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "title"
+   ]
+  }
+ },
+ {
+  "name": "event",
+  "description": "Add an event to the iPhone Calendar right away (no need to ask first; it can be undone). start: ISO 8601 with the local UTC offset, worked out from today's date. place (optional): where it is; adds a time-to-leave alert. Read back the title, day and time from the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "title": {
+     "type": "STRING"
+    },
+    "start": {
+     "type": "STRING"
+    },
+    "durationMin": {
+     "type": "NUMBER"
+    },
+    "place": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "title",
+    "start"
+   ]
+  }
+ },
+ {
+  "name": "email",
+  "description": "Open an email draft for the user to send.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "to": {
+     "type": "STRING"
+    },
+    "subject": {
+     "type": "STRING"
+    },
+    "body": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "subject",
+    "body"
+   ]
+  }
+ },
+ {
+  "name": "navigate",
+  "description": "Start Apple Maps directions.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "destination": {
+     "type": "STRING"
+    },
+    "mode": {
+     "type": "STRING",
+     "enum": [
+      "walking",
+      "driving",
+      "transit"
+     ]
+    }
+   },
+   "required": [
+    "destination"
+   ]
+  }
+ },
+ {
+  "name": "save_spot",
+  "description": "Remember the user's current location, e.g. where they parked. label defaults to car.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "label": {
+     "type": "STRING"
+    }
+   }
+  }
+ },
+ {
+  "name": "find_spot",
+  "description": "Where did I park / take me back to a saved spot. Opens walking directions.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "label": {
+     "type": "STRING"
+    }
+   }
+  }
+ },
+ {
+  "name": "place_reminder",
+  "description": "Reminder that goes off when the user arrives at or leaves a place (\"remind me when I get home\"). place: home, work, a saved spot, an address or a store name.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "title": {
+     "type": "STRING"
+    },
+    "place": {
+     "type": "STRING"
+    },
+    "when": {
+     "type": "STRING",
+     "enum": [
+      "arrive",
+      "leave"
+     ]
+    }
+   },
+   "required": [
+    "title",
+    "place"
+   ]
+  }
+ },
+ {
+  "name": "what_you_know",
+  "description": "List what Alice remembers about the user (\"what do you know about me?\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "forget",
+  "description": "Forget a remembered fact. match: the exact fact text as it appears in what you know.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "match": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "match"
+   ]
+  }
+ },
+ {
+  "name": "take_notes",
+  "description": "Meeting notes. action start: Alice goes quiet, records and transcribes the meeting; stop: writes summary, decisions and action items. Say the result back.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "action": {
+     "type": "STRING",
+     "enum": [
+      "start",
+      "stop"
+     ]
+    },
+    "title": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "action"
+   ]
+  }
+ },
+ {
+  "name": "directions",
+  "description": "Spoken turn-by-turn directions through the glasses from where the user is now (the app knows their location). to: address, business or place; mode: driving or walking. If the result lists options and asks which one, read them, let the user pick, then call again with the same to and choice 1-3. Otherwise read back the overview.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "to": {
+     "type": "STRING"
+    },
+    "mode": {
+     "type": "STRING",
+     "enum": [
+      "driving",
+      "walking"
+     ]
+    },
+    "choice": {
+     "type": "NUMBER"
+    }
+   },
+   "required": [
+    "to"
+   ]
+  }
+ },
+ {
+  "name": "stop_directions",
+  "description": "Stop turn-by-turn directions.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "catch_up",
+  "description": "What did I miss: rest of today, next events, timers, weather. Say the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "person_note",
+  "description": "Remember something about a person the user introduces or describes (\"this is Mike from work\", \"Sarah's birthday is May 3\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "name": {
+     "type": "STRING"
+    },
+    "note": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "name",
+    "note"
+   ]
+  }
+ },
+ {
+  "name": "person_info",
+  "description": "What Alice knows about a person (\"who is Mike?\", \"what do I know about Sarah?\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "name": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "read_this",
+  "description": "Read an article or text aloud: what the user copied, or url. summarize true to sum it up instead. If it says it is reading, just say okay.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "url": {
+     "type": "STRING"
+    },
+    "summarize": {
+     "type": "BOOLEAN"
+    }
+   }
+  }
+ },
+ {
+  "name": "daily_recap",
+  "description": "Recap the user's day (calendar, finished reminders, notes, meetings). Say the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "learn_word",
+  "description": "Learn how to hear and spell a name or word the user says (\"learn the name Kylee, K-Y-L-E-E\"), or one you got wrong.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "word": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "word"
+   ]
+  }
+ },
+ {
+  "name": "undo_last",
+  "description": "Undo the event or reminder just added (\"undo\", \"remove that\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "scan_doc",
+  "description": "Scan a paper document (one or more pages) into a PDF with its text, saved in Files. Say the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "photo_file",
+  "description": "Take a picture (flyer, appointment card, ticket, receipt, whiteboard...) and file it: target calendar, reminder, note or auto. fromLibrary true to pick an existing photo. Say the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "target": {
+     "type": "STRING",
+     "enum": [
+      "auto",
+      "calendar",
+      "reminder",
+      "note"
+     ]
+    },
+    "fromLibrary": {
+     "type": "BOOLEAN"
+    }
+   }
+  }
+ },
+ {
+  "name": "run_shortcut",
+  "description": "Run one of the user's Siri Shortcuts by name (e.g. smart-home lights, thermostat, scenes).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "name": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "list_add",
+  "description": "Add items to a list in iPhone Reminders (shopping, to-do, any name; created if missing).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "list": {
+     "type": "STRING"
+    },
+    "items": {
+     "type": "ARRAY",
+     "items": {
+      "type": "STRING"
+     }
+    }
+   },
+   "required": [
+    "list",
+    "items"
+   ]
+  }
+ },
+ {
+  "name": "list_read",
+  "description": "Read what is on a list.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "list": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "list"
+   ]
+  }
+ },
+ {
+  "name": "list_check",
+  "description": "Check off / remove an item from a list.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "list": {
+     "type": "STRING"
+    },
+    "item": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "list",
+    "item"
+   ]
+  }
+ },
+ {
+  "name": "emergency",
+  "description": "User needs help: prepares a text with their location to their emergency contacts.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "call_911",
+  "description": "Call 911. ONLY after the user clearly says yes to calling 911.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "call",
+  "description": "Phone call to a contact (\"call Mom\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "who": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "who"
+   ]
+  }
+ },
+ {
+  "name": "text",
+  "description": "Text message to a contact; opens Messages filled in.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "who": {
+     "type": "STRING"
+    },
+    "body": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "who",
+    "body"
+   ]
+  }
+ },
+ {
+  "name": "timer",
+  "description": "Countdown timer in seconds, optional label.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "seconds": {
+     "type": "NUMBER"
+    },
+    "label": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "seconds"
+   ]
+  }
+ },
+ {
+  "name": "alarm",
+  "description": "Alarm at a local date-time (ISO 8601 with offset), optional label.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "at": {
+     "type": "STRING"
+    },
+    "label": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "at"
+   ]
+  }
+ },
+ {
+  "name": "show_camera",
+  "description": "Turn the live camera view on so you can SEE: use it when the user asks what they are looking at, to read something, identify something, or \"look at this\". Then describe what you see in the incoming frames. on:false to close it.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "on": {
+     "type": "BOOLEAN"
+    }
+   },
+   "required": [
+    "on"
+   ]
+  }
+ },
+ {
+  "name": "cancel_timers",
+  "description": "Cancel the timers and alarms Alice set.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "play_music",
+  "description": "Play an artist, song, album or playlist. app: apple (default) or spotify.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "query": {
+     "type": "STRING"
+    },
+    "app": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "query"
+   ]
+  }
+ },
+ {
+  "name": "translator",
+  "description": "Turn the two-way interpreter on (with a language) or off.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "language": {
+     "type": "STRING"
+    },
+    "on": {
+     "type": "BOOLEAN"
+    }
+   },
+   "required": [
+    "on"
+   ]
+  }
+ },
+ {
+  "name": "briefing",
+  "description": "Daily briefing: today's schedule, the weather here and the top headlines. Use for \"brief me\", \"good morning\", \"what does my day look like\".",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "look_up",
+  "description": "Search the web for current, live information: news, sports scores, stock and crypto prices, events, opening hours, people in the news, anything recent or that changes. Use it whenever you are not sure your knowledge is current.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "query": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "query"
+   ]
+  }
+ },
+ {
+  "name": "stop_listening",
+  "description": "End the conversation and stop listening when the user says stop listening, go to sleep, that's all, be quiet, or similar.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "report_problem",
+  "description": "Add a problem report to Alice's diagnostic log, in the user's words, when they say something went wrong (\"log that\", \"that didn't work\", \"note a problem\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "text": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "text"
+   ]
+  }
+ },
+ {
+  "name": "weather",
+  "description": "Live weather and forecast. Omit place for the user's current location.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "place": {
+     "type": "STRING"
+    },
+    "days": {
+     "type": "NUMBER"
+    }
+   }
+  }
+ },
+ {
+  "name": "where_am_i",
+  "description": "Tell the user where they are (street/city).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "agenda",
+  "description": "What is coming up: calendar events and reminders for the next N days (default 7). Use for \"what do I have today/this week/on Tuesday\".",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "days": {
+     "type": "NUMBER"
+    }
+   }
+  }
+ },
+ {
+  "name": "glasses_status",
+  "description": "Glasses connection, battery and photo count.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "recall",
+  "description": "Search everything the user and Alice said in past conversations (any day). query: topic words and/or a time (\"yesterday\", \"last week\"). last: N for \"the last N things I said\". who: user, assistant or any.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "query": {
+     "type": "STRING"
+    },
+    "last": {
+     "type": "NUMBER"
+    },
+    "who": {
+     "type": "STRING",
+     "enum": [
+      "user",
+      "assistant",
+      "any"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "name": "shop",
+  "description": "Order or buy something from a store (Walmart, Target, Amazon, Instacart, Kroger, Costco, Chewy...): opens the store app at that item. Remembers the usual store, brand and pickup/delivery, so only pass what the user said. The user confirms payment themselves.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "item": {
+     "type": "STRING"
+    },
+    "store": {
+     "type": "STRING"
+    },
+    "fulfillment": {
+     "type": "STRING",
+     "enum": [
+      "delivery",
+      "pickup"
+     ]
+    },
+    "brand": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "item"
+   ]
+  }
+ },
+ {
+  "name": "explain",
+  "description": "List the actions Alice took recently with their results, to explain why (\"why did you do that?\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "coach",
+  "description": "Workout coach mode with the camera: counts reps and gives form cues. on false to stop.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "on": {
+     "type": "BOOLEAN"
+    },
+    "exercise": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "on"
+   ]
+  }
+ },
+ {
+  "name": "log_set",
+  "description": "Log a finished set (exercise, reps, weight in lb).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "exercise": {
+     "type": "STRING"
+    },
+    "reps": {
+     "type": "NUMBER"
+    },
+    "weight": {
+     "type": "NUMBER"
+    }
+   },
+   "required": [
+    "exercise",
+    "reps"
+   ]
+  }
+ },
+ {
+  "name": "workout_history",
+  "description": "Workout history for the last N days (default 7).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "days": {
+     "type": "NUMBER"
+    }
+   }
+  }
+ },
+ {
+  "name": "home_control",
+  "description": "Control smart-home devices through Home Assistant with a plain command (\"turn off the kitchen lights\", \"set the thermostat to 70\", \"lock the front door\", \"open the garage\"). Try this first for devices; fall back to run_shortcut.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "command": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "command"
+   ]
+  }
+ },
+ {
+  "name": "ifttt",
+  "description": "Fire an IFTTT webhook applet by event name (e.g. start_car), optional value.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "event": {
+     "type": "STRING"
+    },
+    "value": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "event"
+   ]
+  }
+ },
+ {
+  "name": "webhook",
+  "description": "Run one of the user's custom connections by name (Zapier/Make/any URL).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "name": {
+     "type": "STRING"
+    },
+    "value": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "music_control",
+  "description": "Control Apple Music playback: pause, resume, next, previous, restart, shuffle_on, shuffle_off, repeat_on, repeat_off, stop, now_playing (\"what's playing?\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "command": {
+     "type": "STRING",
+     "enum": [
+      "pause",
+      "resume",
+      "next",
+      "previous",
+      "restart",
+      "shuffle_on",
+      "shuffle_off",
+      "repeat_on",
+      "repeat_off",
+      "stop",
+      "now_playing"
+     ]
+    }
+   },
+   "required": [
+    "command"
+   ]
+  }
+ },
+ {
+  "name": "email_check",
+  "description": "Gmail inbox: new (unread) emails, or a Gmail search query (from:, subject:, words).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "query": {
+     "type": "STRING"
+    },
+    "count": {
+     "type": "NUMBER"
+    }
+   }
+  }
+ },
+ {
+  "name": "email_read",
+  "description": "Read an email aloud from the last list: which = number (1,2,3), sender name or subject words.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "which": {
+     "type": "STRING"
+    }
+   }
+  }
+ },
+ {
+  "name": "email_reply",
+  "description": "Reply to the email just read. FIRST read the reply text back and get a clear yes; only then call this.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "body": {
+     "type": "STRING"
+    },
+    "which": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "body"
+   ]
+  }
+ },
+ {
+  "name": "email_send",
+  "description": "Send a new email (to: contact name or address). FIRST read recipient, subject and text back and get a clear yes; only then call this.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "to": {
+     "type": "STRING"
+    },
+    "subject": {
+     "type": "STRING"
+    },
+    "body": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "to",
+    "body"
+   ]
+  }
+ },
+ {
+  "name": "email_archive",
+  "description": "Archive an email from the last list (which = number, sender or \"that\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "which": {
+     "type": "STRING"
+    }
+   }
+  }
+ },
+ {
+  "name": "whats_new",
+  "description": "What changed in Alice's latest update (\"what's new?\").",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "capabilities",
+  "description": "What Alice can do (a short spoken overview). Use for \"what can you do?\".",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "health_summary",
+  "description": "Apple Health: last night's sleep, steps and active calories today, resting heart rate, HRV, workouts this week. Use it to tailor workout intensity and advice (general guidance, not medical).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "foresight",
+  "description": "Upcoming deadlines, renewals and dates found in the user's notes, meetings and conversations that are not on the calendar yet. Offer to add reminders.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "self_check",
+  "description": "Run a self-check and repair (\"fix yourself\", \"something is wrong with you\"): permissions, server, glasses, wake word. Say the result.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {}
+  }
+ },
+ {
+  "name": "open_app",
+  "description": "Open an app on the iPhone by name (Spotify, Instagram, Uber, Calendar, Settings...).",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "name": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "name"
+   ]
+  }
+ },
+ {
+  "name": "make_file",
+  "description": "Create a real file: a resume, letter, report, form, plan (word or pdf), a spreadsheet/budget/tracker (excel) or a presentation (powerpoint). It looks up and follows any official standard (e.g. federal resume / USAJOBS rules) and uses a file the user just gave you. request: everything the user asked for, in detail. Say the result; never read the document aloud.",
+  "parameters": {
+   "type": "OBJECT",
+   "properties": {
+    "kind": {
+     "type": "STRING",
+     "enum": [
+      "word",
+      "pdf",
+      "excel",
+      "powerpoint"
+     ]
+    },
+    "request": {
+     "type": "STRING"
+    },
+    "title": {
+     "type": "STRING"
+    }
+   },
+   "required": [
+    "kind",
+    "request"
+   ]
+  }
+ }
+]

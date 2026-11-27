@@ -1,0 +1,16 @@
+name: Live voice end-to-end test
+on:
+  push:
+    branches: [live-test]
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node test/live/extract-tools.mjs
+      - name: Locked token (how the app works today)
+        run: node test/live/live-e2e.mjs locked || true
+      - name: Unlocked token
+        run: node test/live/live-e2e.mjs unlocked || true

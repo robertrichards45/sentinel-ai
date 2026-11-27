@@ -113,7 +113,8 @@ export const server = createServer(async (req, res) => {
       if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Real-time voice needs a Gemini key on the server.' });
       if (!take('global-live', config.limits.globalPerDay)) return send(res, 429, { error: 'Alice is at today\'s capacity. Try again tomorrow.' });
       if (!take('l:' + installId, config.live.perInstallPerDay)) return send(res, 429, { error: 'Conversation limit reached for today.' });
-      const t = await (config.mock ? mock : gemini).liveToken();
+      const lb = await body(req).catch(() => ({}));
+      const t = await (config.mock ? mock : gemini).liveToken({ unlocked: lb?.unlocked === true });
       const base = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage';
       const endpoints = [t.version, t.version === 'v1beta' ? 'v1alpha' : 'v1beta'].map((v) => `${base}.${v}.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(t.token)}`);
       return send(res, 200, { ...t, endpoints });
