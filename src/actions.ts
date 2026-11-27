@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import { healthSummary } from './health';
+=======
+import { briefingHooks } from './briefingHooks';
+import { runForesight } from './foresight';
+>>>>>>> main
 import { whatsNewText, markNewsTold } from './whatsNew';
 import { homeControl, iftttTrigger, runWebhook } from './connections';
 import { CAPABILITIES_SPOKEN } from './capabilities';
@@ -227,13 +232,20 @@ async function runActionInner(a: Action): Promise<string> {
       return 'Translator off.';
     }
     case 'briefing': {
-      // Your day in one go: schedule, weather where you are, and the top headlines.
-      const [agenda, weather, news] = await Promise.all([
+      // "Good morning": schedule, weather, things coming up that aren't on the calendar, the drive to work,
+      // running timers, extras (sleep from Apple Health in the Health edition) and the top headlines.
+      const morning = new Date().getHours() < 11;
+      const spots = await readJson<Record<string, any>>('spots.json', {}).catch(() => ({} as Record<string, any>));
+      const work = spots.work ? { title: 'work', lat: spots.work.lat, lon: spots.work.lon } : null;
+      const [agenda, weather, coming, drive, extras, news] = await Promise.all([
         agendaText(1).catch(() => ''),
         runAction({ type: 'weather' } as Action).catch(() => ''),
+        runForesight().then((l) => l.filter((i) => new Date(i.date + 'T12:00:00').getTime() - Date.now() < 7 * 86400000)).then((l) => (l.length ? `Coming up this week: ${l.slice(0, 3).map((i) => `${i.title} on ${new Date(i.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' })}`).join(', ')}.` : '')).catch(() => ''),
+        morning && work ? driveMinutes(work).then((m) => (m ? `It's about ${m} minutes to work, without live traffic.` : '')).catch(() => '') : Promise.resolve(''),
+        Promise.all(briefingHooks.map((h) => h().catch(() => ''))).then((l) => l.filter(Boolean).join(' ')),
         runAction({ type: 'look_up', query: 'top 3 news headlines today, one line each' } as Action).catch(() => ''),
       ]);
-      return [agenda, weather, news].filter(Boolean).join(' ');
+      return [morning ? 'Good morning.' : '', extras, agenda, weather, drive, coming, news].filter(Boolean).join(' ');
     }
     case 'look_up': {
       // Live facts from the web through Alice's server (Google Search, verified working).

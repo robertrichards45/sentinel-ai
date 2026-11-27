@@ -6,6 +6,7 @@
  */
 import * as HK from '@kingstinct/react-native-healthkit';
 import { note } from './diary';
+import { briefingHooks } from './briefingHooks';
 
 const READ = ['HKQuantityTypeIdentifierStepCount', 'HKQuantityTypeIdentifierActiveEnergyBurned', 'HKQuantityTypeIdentifierRestingHeartRate', 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN', 'HKCategoryTypeIdentifierSleepAnalysis', 'HKWorkoutTypeIdentifier'] as const;
 
@@ -51,3 +52,14 @@ export async function healthSummary(): Promise<string> {
   note('health', { items: parts.length });
   return parts.length ? `From Apple Health: ${parts.join(', ')}. (General guidance, not medical advice.)` : 'Apple Health has no recent data for me yet, or the permissions are off. Check the Health app, Apps, Alice.';
 }
+
+// Morning briefing: last night's sleep, first thing.
+briefingHooks.push(async () => {
+  if (!(await ready())) return '';
+  const evening = new Date(startOfDay().getTime() - 6 * 3600_000);
+  const sleep: any[] = await HK.queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis' as any, { limit: 0, filter: { date: { startDate: evening, endDate: new Date() } } } as any);
+  const ms = sleep.filter((x) => x.value !== 0 && x.value !== 2).reduce((m, x) => m + (new Date(x.endDate).getTime() - new Date(x.startDate).getTime()), 0);
+  if (!ms) return '';
+  const h = ms / 3600000;
+  return `You slept ${Math.floor(h)} hours ${Math.round((h % 1) * 60)} minutes${h < 6 ? ', so take it easier today' : ''}.`;
+});
