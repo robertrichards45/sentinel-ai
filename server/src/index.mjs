@@ -169,6 +169,7 @@ export const server = createServer(async (req, res) => {
   } catch (e) {
     const status = e.status && e.status >= 400 && e.status < 600 ? (e.status === 401 || e.status === 403 ? 502 : e.status) : 500;
     console.error(new Date().toISOString(), req.method, url.pathname, status, String(e.message).slice(0, 200)); // never logs bodies or keys
+    if (status === 413) res.setHeader('Connection', 'close'); // the rest of the oversized body is still on the socket: don't reuse it
     return send(res, status, { error: String(e.message ?? 'Server error').slice(0, 300) });
   }
 });
