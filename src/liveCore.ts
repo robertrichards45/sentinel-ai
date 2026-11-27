@@ -59,3 +59,13 @@ export class NoiseGate {
     return out;
   }
 }
+
+/** She claims she can't remember past conversations (she can). */
+export const saysNoMemory = (t: string) => /\b(don'?t|do not|can'?t|cannot)\b[^.]{0,40}\b(access|remember|see|recall)\b[^.]{0,60}\b(previous|past|earlier|prior|before)\b|\bno (memory|access) (of|to) (our |your |previous |past )/i.test(t);
+/** She drifted into Spanish. */
+export function looksSpanish(t: string): boolean {
+  const l = t.toLowerCase();
+  const es = (l.match(/(?<![\p{L}])(que|está|estás|puedo|ayudarte|hola|gracias|claro|para|pero|también|aquí|bueno|vale|sí|tú|usted|quieres|ahora|muy)(?![\p{L}])/gu) ?? []).length;
+  const en = (l.match(/\b(the|you|and|that|is|it|to|what|your|can|i'm|i)\b/g) ?? []).length;
+  return es >= 3 && es > en;
+}

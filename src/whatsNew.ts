@@ -8,6 +8,12 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.19.0', date: '2026-11-27', items: [
+    'If I ever say I can\'t remember our past conversations, or slip into Spanish, I catch it and correct myself right away',
+    'Hey Alice is steadier in the background',
+    'When I read you something, it\'s in my normal conversation voice',
+    'Gmail by voice, once you connect it in Settings',
+  ] },
   { version: '0.18.2', date: '2026-11-27', items: [
     'I control Apple Music: play any song, artist, album or playlist in your library, pause, skip, go back, shuffle, and tell you what\'s playing',
   ] },

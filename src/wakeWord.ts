@@ -10,7 +10,8 @@ import { getSettings, onSettings } from './settings';
 import { appMicBusy } from './micState';
 import { onSpeaking } from './voice';
 import { live } from './live';
-import './keepAlive';
+// (The silent keep-alive player was removed in 0.18.3: the log showed it interrupting Hey Alice's microphone.
+// On-device continuous recognition keeps the mic, and the app, running in the background by itself.)
 import { glassesVoiceActive } from './glassesVoice';
 import { wake } from './triggers';
 import { note } from './diary';

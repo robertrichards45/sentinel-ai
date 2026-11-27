@@ -1,3 +1,4 @@
+import { note } from './diary';
 import { offlineNow } from './netState';
 import * as Speech from 'expo-speech';
 import { AudioRecorder, AudioPlayer, createAudioPlayer, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
@@ -183,6 +184,7 @@ export function speak(text: string, language?: string, modeId?: string): Promise
     if (gen !== generation) return;
     if (voice !== 'iphone' && !s.privacyMode && !offlineNow() && liveSpeaker && (!language || language === s.voiceLanguage)) {
       try { if (await liveSpeaker.say(text.slice(0, 3000), () => gen === generation)) return; } catch {}
+      note('voice-fallback', { chars: text.length }); // spoke with the other (text-to-speech) voice
       if (gen !== generation) return;
     }
     if (voice !== 'iphone' && !s.privacyMode && !offlineNow()) {

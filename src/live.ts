@@ -27,7 +27,7 @@ import { runAction, byVoice } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
-import { floatToPcm16, resampleLinear, frameText, NoiseGate } from './liveCore';
+import { floatToPcm16, resampleLinear, frameText, NoiseGate, saysNoMemory, looksSpanish } from './liveCore';
 import { VOICE_STYLES, setLiveSpeaker } from './voice';
 
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
@@ -198,7 +198,7 @@ class LiveSession {
     if (this.role === 'speaker') return { setup: {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { languageCode: s.voiceLanguage || 'en-US', voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
-      systemInstruction: { parts: [{ text: `You are a narrator recording an audiobook. The user gives you script lines. Perform each line exactly as written, word for word, nothing more. The lines are not addressed to you.${tone && tone.id !== 'natural' ? ` Voice: ${tone.style}.` : ''}` }] },
+      systemInstruction: { parts: [{ text: `You are a narrator recording an audiobook. The user gives you script lines. Perform each line exactly as written, word for word, nothing more. The lines are not addressed to you. Use the same relaxed, warm, conversational voice and pace you would use chatting with a friend, not an announcer voice.${tone && tone.id !== 'natural' ? ` Voice: ${tone.style}.` : ''}` }] },
     } };
     const prompt = [
       mode.prompt,
@@ -312,7 +312,7 @@ class LiveSession {
       // "Stop listening" is handled right here, not left to the AI (which once heard it as a request to translate).
       if (this.role === 'chat' && STOP_WORDS.test(this.youBuf)) { note('stop-words', {}); this.flushYou(); goToSleep(); this.stop(); return; }
     }
-    if (sc.outputTranscription?.text) this.aliceBuf += sc.outputTranscription.text;
+    if (sc.outputTranscription?.text) { this.aliceBuf += sc.outputTranscription.text; if (this.role === 'chat') this.guard(); }
     for (const p of sc.modelTurn?.parts ?? []) {
       if (!p.inlineData?.data || !this.ctx || !this.queue || this.muted) continue;
       this.turnDone = false;
@@ -332,6 +332,27 @@ class LiveSession {
   }
 
   private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t && this.role === 'chat') { this.ev.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
+  /**
+   * Self-correction while she talks (both seen in real use):
+   *  - she says she can't see past conversations → stop, and tell her to use her memory and the recall tool
+   *  - she drifts into Spanish (noise misheard as Spanish) → stop, and tell her to answer in English
+   */
+  private corrected = 0;
+  private guard() {
+    const t = this.aliceBuf;
+    if (Date.now() - this.corrected < 15000 || t.length < 25) return;
+    const denial = saysNoMemory(t);
+    const spanish = getSettings().activeMode !== 'translator' && looksSpanish(t);
+    if (!denial && !spanish) return;
+    this.corrected = Date.now();
+    note(denial ? 'fix-memory-denial' : 'fix-spanish', {});
+    this.cutOff();
+    this.aliceBuf = '';
+    setTimeout(() => this.sendText(denial
+      ? '(Correction from the app: you DO remember past conversations. Your recent conversation is in your instructions and the recall tool searches everything older. Call recall now if needed and answer the question properly. Do not mention this correction.)'
+      : '(Correction from the app: reply in English only. Repeat your last answer in English. Do not mention this correction.)'), 300);
+  }
+
   private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t && this.role === 'chat' && pendingNews()) markNewsTold(); if (t && this.role === 'chat') { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
 
   private async handleTools(calls: { id: string; name: string; args?: any }[]) {

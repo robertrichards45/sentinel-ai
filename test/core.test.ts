@@ -8,7 +8,7 @@ import { planOrder, storeLink } from '../src/shopCore';
 import { parseForesight } from '../src/foresightCore';
 import { parseMusicRequest } from '../src/musicCore';
 import { gmailText, buildRaw, describeList } from '../src/gmailCore';
-import { NoiseGate } from '../src/liveCore';
+import { NoiseGate, saysNoMemory, looksSpanish } from '../src/liveCore';
 import { writeFileSync, mkdirSync } from 'fs';
 import { parsePhotoFiling } from '../src/photoCore';
 import { addPersonNote, findPerson, describePerson } from '../src/peopleCore';
@@ -391,6 +391,13 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('music control mapping', (validateAction({ type: 'music_control', command: 'skip' }, modes) as any)?.command === 'next');
   check('music control rejects junk', validateAction({ type: 'music_control', command: 'explode' }, modes) === null);
 }
+
+// --- 0.19: self-correction ---
+check('detects memory denial', saysNoMemory("I don't have access to any previous messages or content you sent before this conversation."));
+check('detects memory denial 2', saysNoMemory("Sorry, I can't remember our past conversations."));
+check('no false memory denial', !saysNoMemory("I don't think you told me that before, want to tell me now?"));
+check('detects Spanish', looksSpanish('Claro, ¿qué quieres que haga ahora? Estoy aquí para ayudarte.'));
+check('English is not Spanish', !looksSpanish("Sure, what do you want me to do now? I'm here to help you."));
 
 // --- 0.19: Gmail ---
 {
