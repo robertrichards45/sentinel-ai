@@ -8,6 +8,9 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.18.1', date: '2026-11-27', items: [
+    'Say good morning and I give you a full briefing: your day, weather, the drive to work, deadlines coming up and the news',
+  ] },
   { version: '0.18.0', date: '2026-11-27', items: [
     'I can control your smart home through Home Assistant, IFTTT or your own webhooks (Settings, Connections)',
     'I read your Apple Health (sleep, steps, heart rate, workouts) if you install the Health version and allow it',
