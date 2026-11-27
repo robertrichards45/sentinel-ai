@@ -1,3 +1,4 @@
+import { playAppleMusic } from './music';
 /** Calls, texts, timers, alarms and music: the everyday things you ask a phone assistant for. */
 import { Linking } from 'react-native';
 import * as SMS from 'expo-sms';
@@ -90,6 +91,7 @@ export async function cancelTimers(): Promise<string> {
 // ---------- Music ----------
 export async function playMusic(query: string, app?: string): Promise<string> {
   const spotify = /spotify/i.test(app ?? '');
+  if (!spotify) { const r = await playAppleMusic(query); if (r) return r; }
   const url = spotify ? `spotify:search:${encodeURIComponent(query)}` : `music://music.apple.com/us/search?term=${encodeURIComponent(query)}`;
   const ok = await Linking.canOpenURL(url).catch(() => false);
   if (!ok && spotify) return "Spotify isn't installed.";
