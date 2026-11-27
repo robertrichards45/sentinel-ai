@@ -21,6 +21,8 @@ import { liveSession } from './ai';
 import { validateAction, Action } from './intents';
 import { peopleNames } from './people';
 import { vocabHint } from './vocab';
+import { selfKnowledge, markNewsTold, pendingNews } from './whatsNew';
+import { CAPABILITIES_SPOKEN } from './capabilities';
 import { runAction, byVoice } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
@@ -90,6 +92,7 @@ const TOOLS = [
   { name: 'home_control', description: 'Control smart-home devices through Home Assistant with a plain command ("turn off the kitchen lights", "set the thermostat to 70", "lock the front door", "open the garage"). Try this first for devices; fall back to run_shortcut.', parameters: { type: 'OBJECT', properties: { command: { type: 'STRING' } }, required: ['command'] } },
   { name: 'ifttt', description: 'Fire an IFTTT webhook applet by event name (e.g. start_car), optional value.', parameters: { type: 'OBJECT', properties: { event: { type: 'STRING' }, value: { type: 'STRING' } }, required: ['event'] } },
   { name: 'webhook', description: 'Run one of the user\'s custom connections by name (Zapier/Make/any URL).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, value: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'whats_new', description: 'What changed in Alice\'s latest update ("what\'s new?").', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'capabilities', description: 'What Alice can do (a short spoken overview). Use for "what can you do?".', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'foresight', description: 'Upcoming deadlines, renewals and dates found in the user\'s notes, meetings and conversations that are not on the calendar yet. Offer to add reminders.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'self_check', description: 'Run a self-check and repair ("fix yourself", "something is wrong with you"): permissions, server, glasses, wake word. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
@@ -193,6 +196,8 @@ class LiveSession {
     } };
     const prompt = [
       mode.prompt,
+      selfKnowledge(),
+      `What you can do (short): ${CAPABILITIES_SPOKEN}`,
       tone && tone.id !== 'natural' ? `Your speaking voice: ${tone.style}.` : '',
       mode.id === 'translator' ? '' : 'Always speak English unless the user clearly speaks to you in another language or asks you to translate.',
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
@@ -240,7 +245,14 @@ class LiveSession {
       clearTimeout(guard);
       if (this.ws !== ws || this.stopping) return;
       if (!ready) return this.connect(i + 1); // try the other API version
-      if (this.handle) { this.set('connecting', 'Reconnecting…'); this.connect(i); } // resume after the ~10 min connection limit
+      // Google ends each connection after ~10 minutes. Resume the same conversation on a NEW connection —
+      // the old access token is single-use, so get a fresh one first (the cause of "Couldn't reach live voice"
+      // after about 10 minutes, seen in the diagnostic log).
+      if (this.handle) {
+        this.set('connecting', 'Reconnecting…');
+        liveSession().then((t) => { if (this.stopping) return; this.endpoints = t.endpoints; this.model = t.model; note('live-resume', {}); this.connect(0); })
+          .catch((e) => { this.set('error', 'The conversation dropped and could not reconnect. Tap to start again.'); note('live-resume-failed', { msg: String(e?.message ?? e) }); this.teardown(); });
+      }
       else { this.set('error', 'The conversation ended.'); this.teardown(); }
     };
   }
@@ -314,7 +326,7 @@ class LiveSession {
   }
 
   private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t && this.role === 'chat') { this.ev.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
-  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t && this.role === 'chat') { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
+  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t && this.role === 'chat' && pendingNews()) markNewsTold(); if (t && this.role === 'chat') { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
 
   private async handleTools(calls: { id: string; name: string; args?: any }[]) {
     this.set('thinking');

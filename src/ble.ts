@@ -65,12 +65,17 @@ class GlassesLink {
     this.wantConnected = true;
     const bt = await this.manager.state();
     if (bt !== State.PoweredOn) {
-      this.setState('bluetooth-off');
+      this.setState('bluetooth-off', String(bt));
+      note('bluetooth-state', { state: String(bt) });
+      // Wait for Bluetooth, but also re-check every 2 s: the state-change event doesn't always arrive
+      // (seen in the log: stuck on "bluetooth-off" after app start).
       await new Promise<void>((res) => {
-        const s = this.manager.onStateChange((st) => {
-          if (st === State.PoweredOn) { s.remove(); res(); }
-        }, true);
+        let done = false;
+        const finish = () => { if (!done) { done = true; sub.remove(); clearInterval(poll); res(); } };
+        const sub = this.manager.onStateChange((st) => { if (st === State.PoweredOn) finish(); }, true);
+        const poll = setInterval(async () => { try { if ((await this.manager.state()) === State.PoweredOn) finish(); } catch {} }, 2000);
       });
+      note('bluetooth-state', { state: 'PoweredOn' });
     }
     // Already connected at system level (common: iPhone keeps the glasses linked)
     const known = await this.manager.connectedDevices([UUID.SVC_A, UUID.SVC_FIRMWARE_UPDATE]);

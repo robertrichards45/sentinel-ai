@@ -39,6 +39,7 @@ export type Action =
   | { type: 'ifttt'; event: string; value?: string }
   | { type: 'webhook'; name: string; value?: string }
   | { type: 'capabilities' }
+  | { type: 'whats_new' }
   | { type: 'shop'; item: string; store?: string; fulfillment?: 'delivery' | 'pickup'; brand?: string }
   | { type: 'recall'; query: string; last?: number; who?: 'user' | 'assistant' | 'any' }
   | { type: 'make_file'; kind: 'word' | 'pdf' | 'excel' | 'powerpoint'; request: string; title?: string }
@@ -113,6 +114,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'explain': return { type: 'explain' };
     case 'foresight': return { type: 'foresight' };
     case 'capabilities': return { type: 'capabilities' };
+    case 'whats_new': return { type: 'whats_new' };
     case 'home_control': { const c = str(a.command, 300); return c ? { type: 'home_control', command: c } : null; }
     case 'ifttt': { const e = str(a.event, 60); const v = str(a.value, 300); return e ? { type: 'ifttt', event: e, ...(v ? { value: v } : {}) } : null; }
     case 'webhook': { const n = str(a.name, 60); const v = str(a.value, 300); return n ? { type: 'webhook', name: n, ...(v ? { value: v } : {}) } : null; }
@@ -251,6 +253,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"home_control","command":"turn off the kitchen lights"}   smart home through Home Assistant (lights, locks, thermostat, garage, TV, car...)
 {"type":"ifttt","event":"start_car"}   fire an IFTTT applet by event name
 {"type":"webhook","name":"Morning routine"}   run one of the user's custom connections
+{"type":"whats_new"}   "what's new?", "what did they update?", "what can you do now?"
 {"type":"capabilities"}   "what can you do?", "what are your features?"
 {"type":"foresight"}   "anything coming up I should know about?", "what deadlines do I have?"
 {"type":"self_check"}   "fix yourself", "run a self-check", "something's wrong with you", "repair yourself"

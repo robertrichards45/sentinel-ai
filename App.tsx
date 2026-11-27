@@ -31,6 +31,7 @@ import './src/selfRepair';
 import { wakeWordReady } from './src/wakeWord';
 import { Onboarding } from './src/screens/Onboarding';
 import { Tour } from './src/screens/Tour';
+import { checkUpdated } from './src/whatsNew';
 import { onTour } from './src/triggers';
 import { startGlasses, activeGlasses as glassesInfoActive } from './src/glasses/connector';
 import { maybeHeadsUp } from './src/headsUp';
@@ -97,7 +98,7 @@ function Shell() {
   useEffect(() => {
     (async () => {
       await Promise.all([loadSettings(), memory.load(), loadModes()]);
-      setHealthUrl(healthUrl()); checkNet();
+      setHealthUrl(healthUrl()); checkNet(); checkUpdated();
       setNeedsSetup(!getSettings().glassesModel);
       if (getSettings().glassesModel && !getSettings().toured) setTour(true); // existing users see the tour once
       setReady(true);

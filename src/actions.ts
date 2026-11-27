@@ -1,3 +1,4 @@
+import { whatsNewText, markNewsTold } from './whatsNew';
 import { homeControl, iftttTrigger, runWebhook } from './connections';
 import { CAPABILITIES_SPOKEN } from './capabilities';
 import { coach, logSet, workoutHistory } from './coach';
@@ -266,6 +267,7 @@ async function runActionInner(a: Action): Promise<string> {
     case 'ifttt': return iftttTrigger(a.event, a.value);
     case 'webhook': return runWebhook(a.name, a.value);
     case 'capabilities': return CAPABILITIES_SPOKEN;
+    case 'whats_new': { const t = whatsNewText(); markNewsTold(); return t; }
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
       if (!lastMade) return "There's nothing for me to undo.";

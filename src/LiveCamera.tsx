@@ -15,6 +15,9 @@ export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; h
   const [perm, ask] = useCameraPermissions();
   const cam = useRef<CameraView>(null);
   const [frames, setFrames] = useState(0);
+  const camReady = useRef(false);
+  const errs = useRef(0);
+  const sent = useRef(0);
 
   useEffect(() => { if (perm && !perm.granted) ask(); }, [perm]);
   useEffect(() => {
@@ -23,15 +26,15 @@ export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; h
     let busy = false, last = 0, alive = true;
     // About 1 picture a second; about 3 a second in workout coach mode so movement shows.
     const t = setInterval(async () => {
-      if (busy || !cam.current || live.state === 'off' || live.state === 'connecting' || Date.now() - last < coachFrameMs()) return;
+      if (busy || !cam.current || !camReady.current || live.state === 'off' || live.state === 'connecting' || Date.now() - last < coachFrameMs()) return;
       busy = true; last = Date.now();
       try {
         const p = await cam.current.takePictureAsync({ quality: coachFrameMs() < 1000 ? 0.25 : 0.35, base64: true, shutterSound: false, skipProcessing: true });
-        if (alive && p?.base64) { live.sendImage(p.base64); setFrames((n) => n + 1); }
-      } catch {}
+        if (alive && p?.base64) { const ok = live.sendImage(p.base64); if (ok) { sent.current++; setFrames((n) => n + 1); } else if (errs.current++ < 3) note('look-send-failed', { state: live.state }); }
+      } catch (e: any) { if (errs.current++ < 3) note('look-error', { msg: String(e?.message ?? e).slice(0, 120) }); }
       busy = false;
     }, 100);
-    return () => { alive = false; clearInterval(t); note('look-off', { frames }); };
+    return () => { alive = false; clearInterval(t); note('look-off', { frames: sent.current, ready: camReady.current }); };
   }, []);
 
   if (!perm?.granted) return <Text style={[S.dim, { textAlign: 'center' }]}>Allow camera access so Alice can see.</Text>;
@@ -39,7 +42,7 @@ export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; h
   if (hidden) return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <View style={{ width: 2, height: 2, overflow: 'hidden', opacity: 0.02 }}>
-        <CameraView ref={cam} style={{ width: 2, height: 2 }} facing="back" pictureSize="640x480" animateShutter={false} />
+        <CameraView ref={cam} style={{ width: 2, height: 2 }} facing="back" pictureSize="640x480" animateShutter={false} onCameraReady={() => { camReady.current = true; }} onMountError={(e) => note('look-error', { msg: String(e?.message ?? e) })} />
       </View>
       <Text style={[S.dim, { textAlign: 'center', fontFamily: F.regular }]}>● Alice can see (camera view hidden)</Text>
     </View>
@@ -47,7 +50,7 @@ export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; h
   return (
     <View style={{ gap: 6 }}>
       <View style={{ height: 220, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.line }}>
-        <CameraView ref={cam} style={{ flex: 1 }} facing="back" pictureSize="640x480" animateShutter={false} />
+        <CameraView ref={cam} style={{ flex: 1 }} facing="back" pictureSize="640x480" animateShutter={false} onCameraReady={() => { camReady.current = true; }} onMountError={(e) => note('look-error', { msg: String(e?.message ?? e) })} />
       </View>
       <Text style={[S.dim, { textAlign: 'center', fontFamily: F.regular }]}>Alice can see this. Ask "what am I looking at?" or "read this to me."</Text>
     </View>
