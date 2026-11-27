@@ -17,7 +17,17 @@ export async function resolvePlace(name: string): Promise<Place | null> {
   }
   const spots = await readJson<Record<string, any>>('spots.json', {});
   if (spots[key]) return { title: key, lat: spots[key].lat, lon: spots[key].lon };
-  const [g] = await Location.geocodeAsync(name).catch(() => [] as Location.LocationGeocodedLocation[]);
+  const geo = (q: string) => Location.geocodeAsync(q).then((r) => r[0]).catch(() => undefined);
+  // A store or place name ("Walmart") with no street number: look in your own town first.
+  let g: Location.LocationGeocodedLocation | undefined;
+  if (!/\d/.test(name)) {
+    try {
+      const pos = await Location.getLastKnownPositionAsync() ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const [a] = await Location.reverseGeocodeAsync({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      if (a?.city) g = await geo(`${name}, ${a.city}${a.region ? ', ' + a.region : ''}`);
+    } catch {}
+  }
+  g = g ?? await geo(name);
   return g ? { title: name, lat: g.latitude, lon: g.longitude } : null;
 }
 

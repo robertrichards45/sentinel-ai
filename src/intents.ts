@@ -11,6 +11,9 @@ export type Action =
   | { type: 'event'; title: string; start: string; durationMin: number; place?: string }
   | { type: 'place_reminder'; title: string; place: string; when: 'arrive' | 'leave' }
   | { type: 'what_you_know' }
+  | { type: 'take_notes'; action: 'start' | 'stop'; title?: string }
+  | { type: 'directions'; to: string; mode: 'driving' | 'walking' }
+  | { type: 'stop_directions' }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
@@ -48,6 +51,9 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'remember': { const fact = str(a.fact, 300); return fact ? { type: 'remember', fact } : null; }
     case 'place_reminder': { const title = str(a.title, 200), place = str(a.place, 200); return title && place ? { type: 'place_reminder', title, place, when: a.when === 'leave' ? 'leave' : 'arrive' } : null; }
     case 'what_you_know': return { type: 'what_you_know' };
+    case 'take_notes': { const title = str(a.title, 80); return { type: 'take_notes', action: a.action === 'stop' ? 'stop' : 'start', ...(title ? { title } : {}) }; }
+    case 'directions': { const to = str(a.to, 200); return to ? { type: 'directions', to, mode: /walk|foot/i.test(String(a.mode ?? '')) ? 'walking' : 'driving' } : null; }
+    case 'stop_directions': return { type: 'stop_directions' };
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
     case 'reminder': {
@@ -129,6 +135,9 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"forget","match":"exact text of the fact to forget, copied from what you know"}
 {"type":"place_reminder","title":"Take out the trash","place":"home","when":"arrive"}   "remind me when I get home / leave work / get to Walmart"
 {"type":"what_you_know"}   "what do you know about me?"
+{"type":"take_notes","action":"start","title":"Budget meeting"}   "take notes", "record this meeting"; action "stop" for "stop taking notes"
+{"type":"directions","to":"Starbucks","mode":"walking"}   turn-by-turn spoken directions; mode driving (default) or walking
+{"type":"stop_directions"}   "stop directions", "cancel navigation"
 {"type":"note","text":"..."}
 {"type":"reminder","title":"...","due":"2026-11-26T09:00:00-05:00"}
 {"type":"event","place":"optional address or place name; adds a time-to-leave alert","title":"...","start":"...","durationMin":60}

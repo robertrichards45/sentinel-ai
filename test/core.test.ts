@@ -1,4 +1,5 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
+import { stepsFromOsrm, newNav, navUpdate, sayDistance, stepText, overview, metersBetween } from '../src/navCore';
 import { parseLearned, parseLearnedUpdate, overlap } from '../src/memoryCore';
 // Unit tests for the pure modules, using the REAL files backed up from the glasses.
 // Run: npx tsx test/core.test.ts
@@ -208,6 +209,42 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   const u = parseLearnedUpdate('{"add":["Drives a 2024 Ford F-150"],"outdated":["Drives a 2021 Dodge Charger"]}');
   check('learner update parsed', u.add.length === 1 && u.outdated[0] === 'Drives a 2021 Dodge Charger');
   check('learner bare array still works', parseLearnedUpdate('["Lives in Ohio"]').add[0] === 'Lives in Ohio');
+}
+
+// --- 0.11.0: meeting notes + directions ---
+{
+  check('notes action start', (validateAction({ type: 'take_notes', action: 'start', title: 'Budget' }, modes) as any)?.title === 'Budget');
+  check('notes action stop', (validateAction({ type: 'take_notes', action: 'stop' }, modes) as any)?.action === 'stop');
+  check('directions walking', (validateAction({ type: 'directions', to: 'Starbucks', mode: 'walking' }, modes) as any)?.mode === 'walking');
+  check('directions default driving', (validateAction({ type: 'directions', to: '1 Main St' }, modes) as any)?.mode === 'driving');
+  check('directions need a place', validateAction({ type: 'directions' }, modes) === null);
+  check('feet', sayDistance(60) === '200 feet', sayDistance(60));
+  check('half mile', sayDistance(800) === 'half a mile', sayDistance(800));
+  check('miles', sayDistance(5000) === '3.1 miles', sayDistance(5000));
+  // Synthetic OSRM route: depart north on Oak St, turn left onto Main St after ~1 km, arrive 300 m later.
+  const osrm = { code: 'Ok', routes: [{ distance: 1300, duration: 180, legs: [{ steps: [
+    { name: 'Oak St', distance: 1000, maneuver: { type: 'depart', location: [-80, 40] } },
+    { name: 'Oak St', distance: 0, maneuver: { type: 'new name', modifier: 'straight', location: [-80, 40.004] } },
+    { name: 'Main St', distance: 300, maneuver: { type: 'turn', modifier: 'left', location: [-80, 40.009] } },
+    { name: '', distance: 0, maneuver: { type: 'arrive', modifier: 'right', location: [-80.0035, 40.009] } },
+  ] }] }] };
+  const steps = stepsFromOsrm(osrm);
+  check('osrm steps parsed, filler dropped', steps.length === 3 && steps[1].road === 'Main St');
+  check('turn text', stepText(steps[1]) === 'Turn left onto Main St');
+  check('overview', overview(steps, 'the bank', 1300, 3).startsWith('Starting directions to the bank. Three quarters of a mile, about 3 minutes. Head out on Oak St. In half a mile, turn left onto Main St.'), overview(steps, 'the bank', 1300, 3));
+  let st = newNav(steps, 'driving');
+  let said: string[] = [];
+  let reroute = false;
+  for (let lat = 40; lat <= 40.009; lat += 0.0005) { const r = navUpdate(st, { lat, lon: -80 }); st = r.state; if (r.say) said.push(r.say); if (r.reroute) reroute = true; }
+  check('heads-up before the turn', said.some((x) => /^In .*, turn left onto Main St$/.test(x)), said);
+  check('turn now, then arrival preview', said.some((x) => x.startsWith('Turn left onto Main St. Then in')), said);
+  check('no false reroute', !reroute);
+  for (let lon = -80; lon >= -80.0035; lon -= 0.0003) { const r = navUpdate(st, { lat: 40.009, lon }); st = r.state; if (r.say) said.push(r.say); }
+  check('arrived', st.done && said[said.length - 1].startsWith("You've arrived. It's on your right"), said);
+  let off = newNav(steps, 'walking');
+  off = navUpdate(off, { lat: 40.008, lon: -80 }).state;
+  check('off route detected', !!navUpdate(off, { lat: 40.008, lon: -80.003 }).reroute);
+  check('haversine ~111 m per 0.001 deg lat', Math.abs(metersBetween({ lat: 40, lon: -80 }, { lat: 40.001, lon: -80 }) - 111) < 1);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

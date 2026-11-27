@@ -14,10 +14,11 @@ import { glasses } from './ble';
 import { opusToOgg } from './oggOpus';
 import { ask, Exchange } from './assistant';
 import { transcribeAudio } from './ai';
+import { takingNotes, currentMeeting, stopNotes } from './meetingNotes';
 import { live, liveReady } from './live';
 import { streamStart, streamFrames, streamEnd, streaming } from './glassesStream';
 import { getSettings } from './settings';
-import { onSpeaking, stopSpeaking } from './voice';
+import { onSpeaking, stopSpeaking, speak } from './voice';
 import { setSessionCheck } from './micState';
 import { isAsleep, wakeUp, whenSleeping } from './quiet';
 
@@ -152,6 +153,14 @@ async function waitLiveReply(): Promise<number | null> {
 }
 
 glasses.on((e: any) => {
+  // Taking meeting notes: the glasses button means "stop notes" (ignore the first few seconds).
+  if (takingNotes()) {
+    if (e.kind === 'busy' && e.on && Date.now() - (currentMeeting()?.started ?? 0) > 5000) {
+      note('notes-stop', { by: 'glasses-button' });
+      stopNotes().then((t) => speak(t)).catch(() => {});
+    }
+    return;
+  }
   // Button pressed while Alice is talking: cut her off and listen to you instead.
   if (e.kind === 'busy' && e.on && (live.state === 'speaking' || speaking)) {
     note('cut-off', { by: 'glasses-button' });

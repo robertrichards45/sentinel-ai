@@ -2,7 +2,7 @@
   "expo": {
     "name": "Alice",
     "slug": "alice",
-    "version": "0.10.1",
+    "version": "0.11.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "31",
+      "buildNumber": "32",
       "infoPlist": {
         "CFBundleDisplayName": "Alice",
         "NSBluetoothAlwaysUsageDescription": "Alice connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
@@ -94,8 +94,8 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Alice tells you where you are and starts directions when you ask.",
-          "locationAlwaysAndWhenInUsePermission": "Alice only uses your location while the app is open.",
-          "isIosBackgroundLocationEnabled": false
+          "locationAlwaysAndWhenInUsePermission": "Choose Always so Alice can keep giving spoken directions with your phone locked in your pocket. She only tracks your location while directions are running.",
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       [

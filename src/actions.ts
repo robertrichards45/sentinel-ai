@@ -1,3 +1,5 @@
+import { startNotes, stopNotes } from './meetingNotes';
+import { startDirections, stopDirections } from './navigation';
 import { resolvePlace, driveMinutes } from './places';
 import { setLook } from './triggers';
 import { callContact, textContact, setTimer, setAlarm, cancelTimers, playMusic } from './comms';
@@ -179,6 +181,9 @@ export async function runAction(a: Action): Promise<string> {
       const r = await respond('general', `Today is ${new Date().toDateString()}. Search the web and answer the question with current facts in 2-4 short spoken sentences. Include dates and numbers. No URLs.`, [], a.query);
       return r.text || 'I could not find anything on that.';
     }
+    case 'take_notes': return a.action === 'stop' ? stopNotes() : startNotes(a.title);
+    case 'directions': return startDirections(a.to, a.mode);
+    case 'stop_directions': return stopDirections();
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye
       return 'Okay, I\'ll stop listening.';

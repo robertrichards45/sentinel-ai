@@ -29,6 +29,8 @@ import { maybeHeadsUp } from './src/headsUp';
 import { getSettings, onSettings } from './src/settings';
 import './src/headsUp';
 import './src/learn';
+import './src/navigation'; // registers the background directions task at startup
+import { ActivityBanner } from './src/ActivityBanner';
 import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
@@ -111,6 +113,7 @@ function Shell() {
       <View style={{ flex: 1, paddingTop: inset.top }}>
         {ready && fontsLoaded && needsSetup ? <Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); }} /> : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
+      {ready && fontsLoaded && !needsSetup ? <ActivityBanner /> : null}
       {ready && fontsLoaded && !needsSetup ? <TabBar tab={tab} setTab={setTab} /> : null}
     </View>
   );
