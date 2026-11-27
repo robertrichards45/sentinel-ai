@@ -10,7 +10,5 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: node test/live/extract-tools.mjs
-      - name: Locked token (how the app works today)
-        run: node test/live/live-e2e.mjs locked || true
-      - name: Unlocked token
-        run: node test/live/live-e2e.mjs unlocked || true
+      - name: Alice's real brain, as the app uses it (34 requests)
+        run: node test/live/live-e2e.mjs app

@@ -94,7 +94,11 @@ export function findAudio(j) {
 // Short-lived token for a real-time (Live API) session. The phone uses it instead of the API key.
 // Locked to the Live model and audio output; valid to START a session for 2 min, usable for 30 min
 // (session resumption may reconnect with the same token inside that window).
-export async function liveToken({ unlocked = false } = {}) {
+// IMPORTANT (found 2026-11-27 with test/live/live-e2e.mjs): a token locked with bidiGenerateContentSetup makes
+// Google IGNORE the app's own setup: Alice's instructions, tools (calls, weather, self-check, memory...) and the
+// chosen voice. Tokens are therefore issued unlocked (still single-use and short-lived). Never lock them again
+// without re-running that test.
+export async function liveToken({ unlocked = true } = {}) {
   const now = Date.now();
   const times = { uses: 1, expireTime: new Date(now + 30 * 60000).toISOString(), newSessionExpireTime: new Date(now + 2 * 60000).toISOString() };
   const setup = { model: `models/${config.live.model}`, generationConfig: { responseModalities: ['AUDIO'] }, sessionResumption: {} };
