@@ -50,12 +50,12 @@ export function markdownToHtmlBody(md: string): string {
   return out.join('\n');
 }
 
-export function documentHtml(title: string, md: string, date = new Date()): string {
+export function documentHtml(title: string, md: string, date = new Date(), opts: { font?: string; size?: number; marginsIn?: number; plain?: boolean } = {}): string {
   const body = markdownToHtmlBody(md);
   const hasH1 = /^<h1>/.test(body);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${esc(title)}</title><style>
-@page { margin: 22mm 20mm; }
-body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11.5pt; line-height: 1.5; color: #15161c; }
+@page { margin: ${opts.marginsIn ? `${opts.marginsIn}in` : '22mm 20mm'}; }
+body { font-family: ${opts.font ? `"${esc(opts.font)}", ` : ''}-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: ${opts.size ?? 11.5}pt; line-height: 1.5; color: #15161c; }
 h1 { font-size: 22pt; margin: 0 0 4pt; letter-spacing: -0.3pt; }
 h2 { font-size: 15pt; margin: 18pt 0 6pt; } h3 { font-size: 12.5pt; margin: 14pt 0 4pt; }
 p { margin: 0 0 9pt; } ul, ol { margin: 0 0 9pt 18pt; padding: 0; } li { margin: 0 0 3pt; }
@@ -66,7 +66,7 @@ hr { border: none; border-top: 0.6pt solid #c9ccd6; margin: 14pt 0; }
 .meta { color: #5b6070; font-size: 9.5pt; margin: 0 0 16pt; }
 </style></head><body>
 ${hasH1 ? '' : `<h1>${esc(title)}</h1>`}
-<p class="meta">${esc(date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))}</p>
+${opts.plain ? '' : `<p class="meta">${esc(date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))}</p>`}
 ${body}
 </body></html>`;
 }

@@ -10,7 +10,7 @@ import { live } from './live';
 import { note } from './diary';
 import { C, F, S } from './ui';
 
-export function LiveCamera({ onClose }: { onClose: () => void }) {
+export function LiveCamera({ onClose, hidden = false }: { onClose: () => void; hidden?: boolean }) {
   const [perm, ask] = useCameraPermissions();
   const cam = useRef<CameraView>(null);
   const [frames, setFrames] = useState(0);
@@ -33,6 +33,15 @@ export function LiveCamera({ onClose }: { onClose: () => void }) {
   }, []);
 
   if (!perm?.granted) return <Text style={[S.dim, { textAlign: 'center' }]}>Allow camera access so Alice can see.</Text>;
+  // Hidden: the camera still runs (iOS needs it on screen), shrunk to a dot, so Alice sees but you don't.
+  if (hidden) return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <View style={{ width: 2, height: 2, overflow: 'hidden', opacity: 0.02 }}>
+        <CameraView ref={cam} style={{ width: 2, height: 2 }} facing="back" pictureSize="640x480" animateShutter={false} />
+      </View>
+      <Text style={[S.dim, { textAlign: 'center', fontFamily: F.regular }]}>● Alice can see (camera view hidden)</Text>
+    </View>
+  );
   return (
     <View style={{ gap: 6 }}>
       <View style={{ height: 220, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.line }}>

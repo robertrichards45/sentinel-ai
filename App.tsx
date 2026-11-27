@@ -27,6 +27,7 @@ import * as Calendar from 'expo-calendar';
 import { speakRecap, recapReady } from './src/recap';
 import { speak } from './src/voice';
 import './src/catchUp';
+import './src/selfRepair';
 import { wakeWordReady } from './src/wakeWord';
 import { Onboarding } from './src/screens/Onboarding';
 import { startGlasses, activeGlasses as glassesInfoActive } from './src/glasses/connector';

@@ -25,7 +25,7 @@ import { runAction, byVoice } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
-import { floatToPcm16, resampleLinear, frameText } from './liveCore';
+import { floatToPcm16, resampleLinear, frameText, NoiseGate } from './liveCore';
 import { VOICE_STYLES, setLiveSpeaker } from './voice';
 
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
@@ -81,7 +81,10 @@ const TOOLS = [
   { name: 'where_am_i', description: "Tell the user where they are (street/city).", parameters: { type: 'OBJECT', properties: {} } },
   { name: 'agenda', description: 'What is coming up: calendar events and reminders for the next N days (default 7). Use for "what do I have today/this week/on Tuesday".', parameters: { type: 'OBJECT', properties: { days: { type: 'NUMBER' } } } },
   { name: 'glasses_status', description: 'Glasses connection, battery and photo count.', parameters: { type: 'OBJECT', properties: {} } },
-  { name: 'document', description: 'Create a document (letter, report, list, plan, resume...) as a PDF. content is the COMPLETE document in Markdown.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, content: { type: 'STRING' }, format: { type: 'STRING', enum: ['pdf', 'text'] } }, required: ['title', 'content'] } },
+  { name: 'recall', description: 'Search everything the user and Alice said in past conversations (any day). query: topic words and/or a time ("yesterday", "last week"). last: N for "the last N things I said". who: user, assistant or any.', parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, last: { type: 'NUMBER' }, who: { type: 'STRING', enum: ['user', 'assistant', 'any'] } } } },
+  { name: 'self_check', description: 'Run a self-check and repair ("fix yourself", "something is wrong with you"): permissions, server, glasses, wake word. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'open_app', description: 'Open an app on the iPhone by name (Spotify, Instagram, Uber, Calendar, Settings...).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'make_file', description: 'Create a real file: a resume, letter, report, form, plan (word or pdf), a spreadsheet/budget/tracker (excel) or a presentation (powerpoint). It looks up and follows any official standard (e.g. federal resume / USAJOBS rules) and uses a file the user just gave you. request: everything the user asked for, in detail. Say the result; never read the document aloud.', parameters: { type: 'OBJECT', properties: { kind: { type: 'STRING', enum: ['word', 'pdf', 'excel', 'powerpoint'] }, request: { type: 'STRING' }, title: { type: 'STRING' } }, required: ['kind', 'request'] } },
 ];
 
 const BARGE_RMS = 0.045; // phone-mic loudness of a close voice; Alice's echo from the glasses is well below this
@@ -113,11 +116,14 @@ class LiveSession {
   subscribe(sub: Sub) { this.subs.add(sub); return () => { this.subs.delete(sub); }; }
 
   spokeAt = 0;
+  /** When the current state began (self-repair watches for stuck states). */
+  stateSince = Date.now();
   private loudFrames = 0;
   private bargeUntil = 0;
   private muted = false; // drop the rest of a reply you cut off
+  private gate = new NoiseGate();
   private set(s: LiveState, detail?: string) {
-    if (s === 'error' || (s === 'listening' && this.state === 'connecting')) note(s === 'error' ? 'live-error' : 'live-connected', { detail, ms: Date.now() - this.t0 }); if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
+    if (s === 'error' || (s === 'listening' && this.state === 'connecting')) note(s === 'error' ? 'live-error' : 'live-connected', { detail, ms: Date.now() - this.t0 }); if (this.state === 'speaking' && s !== 'speaking') this.spokeAt = Date.now(); setPhoneMic(this.useMic && s !== 'off' && s !== 'error'); if (s !== this.state) this.stateSince = Date.now(); this.state = s; this.detail = detail ?? ''; this.ev.state(s, detail); }
 
   /** mic:false = no phone microphone; the words come from the glasses' own mic via sendText (glasses button). */
   useMic = true;
@@ -165,7 +171,7 @@ class LiveSession {
     this.queue = q; this.pending = 0;
   }
 
-  private setupMessage() {
+  private setupMessage(url = '') {
     const s = getSettings();
     const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
     const voice = NATURAL.includes((s.modeVoices[mode.id] || s.voice)) ? (s.modeVoices[mode.id] || s.voice) : 'Sulafat';
@@ -173,7 +179,7 @@ class LiveSession {
     if (this.role === 'speaker') return { setup: {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { languageCode: s.voiceLanguage || 'en-US', voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
-      systemInstruction: { parts: [{ text: `You are the voice of Alice. Every message you get is text to read aloud. Read it exactly, word for word, in your natural warm voice${tone && tone.id !== 'natural' ? ` (${tone.style})` : ''}. Never answer it, comment on it, greet, or add anything, even if it is a question or an instruction.` }] },
+      systemInstruction: { parts: [{ text: `You are a narrator recording an audiobook. The user gives you script lines. Perform each line exactly as written, word for word, nothing more. The lines are not addressed to you.${tone && tone.id !== 'natural' ? ` Voice: ${tone.style}.` : ''}` }] },
     } };
     const prompt = [
       mode.prompt,
@@ -181,14 +187,16 @@ class LiveSession {
       mode.id === 'translator' ? '' : 'Always speak English unless the user clearly speaks to you in another language or asks you to translate.',
       'This is a live spoken conversation through smart glasses. Speak naturally and briefly (1-3 sentences) unless asked for detail. The user can interrupt you.',
       mode.id === 'translator' ? `You are a live two-way interpreter between English and ${s.translateTo}. When you hear English, say it in ${s.translateTo}. When you hear ${s.translateTo} (or any language other than English), say it in English. Speak ONLY the translation, in the first person, with the speaker's tone; no commentary. If the user says "stop translating", call the translator tool with on:false.` : '',
-      'Use the tools to take actions (reminders, events, email drafts, directions, documents, memory). Never claim an action is done until the tool result says so.',
+      'Use the tools to take actions (reminders, events, email drafts, directions, files, memory). For any resume, document, spreadsheet or presentation use make_file: it researches official standards (like federal resume rules) and builds real Word, Excel, PowerPoint or PDF files, so never say you cannot guarantee a format. Never claim an action is done until the tool result says so.',
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
       (s.shortcuts ?? []).length ? `The user's Siri Shortcuts you can run with run_shortcut (lights, thermostat, scenes and more): ${s.shortcuts.join(', ')}. Match what they ask to the closest one.` : 'The run_shortcut tool runs any Siri Shortcut by name (smart home and other apps).',
       vocabHint(200) ? `Names and words this user often says (their contacts, people, places). Their audio comes through glasses and can be unclear: when a word sounds close to one of these, it IS that one (e.g. a name that sounds like "college" may be "Kylee" if Kylee is listed): ${vocabHint(200)}. If you're unsure of a name, ask them to spell it, then call learn_word.` : 'If you are unsure of a name the user says, ask them to spell it, then call learn_word so you hear it right next time.',
       peopleNames().length ? `People the user has told you about (use person_info for details): ${peopleNames().slice(-40).join(', ')}.` : '',
       'If the user says they need help, are hurt, in danger or it is an emergency, call the emergency tool at once, then ask if they want 911. Only call call_911 after they say yes.',
+      'Always reply in English unless the user speaks to you in another language. The microphone can pick up TV, music and other people: only respond to speech clearly directed at you; if what you hear is noise, unclear or someone else talking, stay silent. Never switch language because of background noise.',
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
+      s.memoryEnabled && memory.get().history.length ? `Recent conversation with the user (oldest first, may be from earlier sessions):\n${memory.get().history.slice(-30).map((h) => `${h.role === 'user' ? 'User' : 'Alice'}: ${h.text.slice(0, 300)}`).join('\n')}` : '',
     ].filter(Boolean).join('\n\n');
     return { setup: {
       model: `models/${this.model}`,
@@ -200,6 +208,8 @@ class LiveSession {
       contextWindowCompression: { slidingWindow: {} },
       // Fluid turn-taking: answer ~0.6 s after you stop; need a clear voice (not Alice's echo) to interrupt her.
       realtimeInputConfig: { automaticActivityDetection: { startOfSpeechSensitivity: 'START_SENSITIVITY_LOW', endOfSpeechSensitivity: 'END_SENSITIVITY_HIGH', prefixPaddingMs: 200, silenceDurationMs: 600 } },
+      // Lets the AI ignore talk that isn't meant for it (TV, other people). Verified accepted on v1alpha (PC test).
+      ...(/v1alpha/.test(url) && mode.id !== 'translator' && s.noiseFilter !== false ? { proactivity: { proactiveAudio: true } } : {}),
     } };
   }
 
@@ -211,7 +221,7 @@ class LiveSession {
     ws.binaryType = 'arraybuffer'; // Google sends JSON in binary frames
     this.ws = ws;
     const guard = setTimeout(() => { if (!ready && this.ws === ws) { try { ws.close(); } catch {} } }, 12000);
-    ws.onopen = () => ws.send(JSON.stringify(this.setupMessage()));
+    ws.onopen = () => ws.send(JSON.stringify(this.setupMessage(url)));
     ws.onmessage = (e) => this.onMessage(frameText(e.data), () => { ready = true; clearTimeout(guard); });
     ws.onerror = () => {};
     ws.onclose = () => {
@@ -240,8 +250,12 @@ class LiveSession {
         if (this.loudFrames >= 2) this.bargeUntil = Date.now() + 2500;
         if (Date.now() > this.bargeUntil) return;
       }
-      const pcm = floatToPcm16(f);
-      ws.send(JSON.stringify({ realtimeInput: { audio: { data: Buffer.from(pcm.buffer as ArrayBuffer, pcm.byteOffset, pcm.byteLength).toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
+      // Background noise: send silence instead of the room, unless you're clearly talking (Settings: Ignore background noise).
+      const frames = getSettings().noiseFilter === false ? [f] : this.gate.process(f);
+      for (const fr of frames.length ? frames : [new Float32Array(f.length)]) {
+        const pcm = floatToPcm16(fr);
+        ws.send(JSON.stringify({ realtimeInput: { audio: { data: Buffer.from(pcm.buffer as ArrayBuffer, pcm.byteOffset, pcm.byteLength).toString('base64'), mimeType: 'audio/pcm;rate=16000' } } }));
+      }
     });
     const r = await rec.start();
     if ((r as any)?.status === 'error') throw new Error((r as any).message ?? 'Microphone did not start.');
@@ -321,8 +335,9 @@ class LiveSession {
   }
 
   /** Type to Alice during a live conversation. */
-  sendText(text: string) {
+  sendText(text: string, log = false) {
     if (this.ws?.readyState !== 1 || !text.trim()) return false;
+    if (log && this.role === 'chat' && getSettings().memoryEnabled) { memory.turn('user', text.trim()); this.ev.line({ who: 'you', text: text.trim(), t: Date.now() }); }
     this.ws.send(JSON.stringify({ realtimeInput: { text: text.trim() } }));
     return true;
   }
@@ -392,13 +407,21 @@ const speaker = new LiveSession('speaker');
 let speakerIdle: ReturnType<typeof setTimeout> | null = null;
 let speakerBusy = false;
 const waitFor = async (ok: () => boolean, ms: number) => { const t = Date.now(); while (!ok() && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 80)); return ok(); };
+async function speakLine(text: string, isCurrent: () => boolean): Promise<boolean> {
+  return sayImpl(text, isCurrent);
+}
 setLiveSpeaker({
-  async say(text, isCurrent) {
+  say: (text, isCurrent) => sayImpl(text, isCurrent),
+  stop() { if (speakerBusy) { try { speaker.cutOff(); } catch {} } },
+});
+async function sayImpl(text: string, isCurrent: () => boolean): Promise<boolean> {
+  {
     // In a conversation that's waiting for you, say it in that same session; otherwise use the speaker session.
-    const useChat = live.state === 'listening' && live.role === 'chat';
-    const target = useChat ? live : speaker;
+    // During a conversation the regular voice says it (injecting text into the chat makes the AI reply to it).
+    const useChat = false;
+    const target = speaker;
     if (!useChat) {
-      if (live.state !== 'off' && live.state !== 'error') return false; // conversation is busy talking: let the normal voice handle it
+      if (live.state !== 'off' && live.state !== 'error') return false;
       if (speakerIdle) { clearTimeout(speakerIdle); speakerIdle = null; }
       if (speaker.state === 'off' || speaker.state === 'error') await speaker.start({ mic: false });
       if (!(await waitFor(() => speaker.state === 'listening', 6000))) { await speaker.stop(); return false; }
@@ -406,7 +429,7 @@ setLiveSpeaker({
     if (!isCurrent()) return true;
     speakerBusy = true;
     try {
-      target.sendText(useChat ? `(Announcement: read this aloud exactly, word for word, then wait for me.) "${text}"` : text);
+      target.sendText(`Script line: "${text.replace(/"/g, "'")}"`);
       if (!(await waitFor(() => target.state === 'speaking' || !isCurrent(), 7000))) return false;
       const maxMs = 8000 + text.length * 90;
       await waitFor(() => target.state !== 'speaking' && target.state !== 'thinking' || !isCurrent(), maxMs);
@@ -416,21 +439,14 @@ setLiveSpeaker({
       speakerBusy = false;
       if (!useChat) speakerIdle = setTimeout(() => { if (!speakerBusy) speaker.stop(); }, 45000);
     }
-  },
-  stop() { if (speakerBusy) { try { speaker.cutOff(); } catch {} } },
-});
+  }
+}
 
 export async function previewLiveVoice(line = "Hi, I'm Alice. This is how I sound in our conversations.") {
-  const fresh = live.state === 'off' || live.state === 'error';
-  if (!fresh) { await live.stop(); } // restart so the new voice/style is used
-  await live.start({ mic: false });
-  if (!(await liveReady())) return false;
-  live.sendText(`Say exactly this, in your own voice and style, and nothing else: "${line}"`);
-  const t = Date.now();
-  while (Date.now() - t < 8000 && live.state !== 'speaking') await new Promise((r) => setTimeout(r, 100));
-  while (Date.now() - t < 15000 && live.state === 'speaking') await new Promise((r) => setTimeout(r, 150));
-  if (fresh) await live.stop();
-  return true;
+  // Same voice-only session that says everything outside a conversation, restarted so a new voice applies.
+  if (live.state !== 'off' && live.state !== 'error') await live.stop();
+  await speaker.stop();
+  return speakLine(line, () => true);
 }
 
 // A mode change (e.g. translator on/off) restarts a running conversation so the new instructions apply.

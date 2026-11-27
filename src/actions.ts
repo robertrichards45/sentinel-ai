@@ -1,3 +1,7 @@
+import { selfCheck } from './selfRepair';
+import { recallText } from './convoLog';
+import { openApp } from './apps';
+import { makeFile } from './makeFile';
 import { learnWord } from './vocab';
 import { AppState } from 'react-native';
 import { scanDocument } from './docScan';
@@ -230,6 +234,10 @@ export async function runAction(a: Action): Promise<string> {
     case 'read_this': return readThis({ url: a.url, summarize: a.summarize });
     case 'daily_recap': return recapText();
     case 'learn_word': return learnWord(a.word);
+    case 'open_app': return openApp(a.name);
+    case 'self_check': return selfCheck();
+    case 'recall': return recallText(a.query, a.last, a.who);
+    case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
       if (!lastMade) return "There's nothing for me to undo.";
       const m = lastMade; lastMade = null;

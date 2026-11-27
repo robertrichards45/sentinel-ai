@@ -1,4 +1,10 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
+import { markdownToDocx, sheetsToXlsx, slidesToPptx } from '../src/officeCore';
+import { parseDocReply, parseSheetsReply, parseSlidesReply } from '../src/makeFileCore';
+import { recall, dateRange } from '../src/recallCore';
+import { appUrl } from '../src/appsCore';
+import { NoiseGate } from '../src/liveCore';
+import { writeFileSync, mkdirSync } from 'fs';
 import { parsePhotoFiling } from '../src/photoCore';
 import { addPersonNote, findPerson, describePerson } from '../src/peopleCore';
 import { chunksForReading } from '../src/speechCore';
@@ -81,7 +87,7 @@ check('duplicate facts ignored', m.facts.length === 1);
 const fg = forget(addFact(m, 'Gate code is on the fridge'), 'truck');
 check('forget removes only matching facts', fg.removed === 1 && fg.state.facts.length === 1, fg);
 let h = EMPTY;
-for (let i = 0; i < 40; i++) h = addTurn(h, 'user', 'msg ' + i);
+for (let i = 0; i < MAX_HISTORY + 16; i++) h = addTurn(h, 'user', 'msg ' + i);
 check(`history capped at ${MAX_HISTORY}`, h.history.length === MAX_HISTORY && h.history[0].text === 'msg 16');
 check('memory prompt contains facts', memoryPrompt(m).includes('F-150'));
 
@@ -321,6 +327,45 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('offline undo', (parseOffline('undo', []) as any)?.action?.type === 'undo_last');
   check('scan_doc action', (validateAction({ type: 'scan_doc' }, modes) as any)?.type === 'scan_doc');
   check('photo_file target', (validateAction({ type: 'photo_file', target: 'my calendar' }, modes) as any)?.target === 'calendar');
+}
+
+// --- 0.16.0: files, memory recall, apps, noise ---
+{
+  const d = parseDocReply('STANDARD: OPM federal resume (USAJOBS, 2 pages)\nFONT: Times New Roman, 12, 1\n---\n# Robert Richards\n## Work Experience\n- Did things');
+  check('doc reply standard', d.standard.startsWith('OPM') && d.font === 'Times New Roman' && d.size === 12 && d.margins === 1 && d.title === 'Robert Richards' && d.markdown.startsWith('# Robert'), d);
+  check('doc reply plain markdown', parseDocReply('# Plan\n- a').markdown === '# Plan\n- a');
+  check('sheets reply', parseSheetsReply('```json\n{"standard":"none","sheets":[{"name":"Budget","rows":[["Item","Cost"],["Rent",1200],["Total","=SUM(B2:B2)"]]}]}\n```')?.sheets[0].rows[1][1] === 1200);
+  check('slides reply', parseSlidesReply('{"title":"Pitch","slides":[{"title":"Why","bullets":["a","b"]}]}')?.slides[0].bullets.length === 2);
+  const docx = markdownToDocx('# T\n- a\n| a | b |\n|---|---|\n| 1 | 2 |'), xlsx = sheetsToXlsx([{ name: 'S', rows: [['a', 1]] }]), pptx = slidesToPptx('Deck', [{ title: 'One', bullets: ['x'] }]);
+  check('office files are zips', [docx, xlsx, pptx].every((b) => b[0] === 0x50 && b[1] === 0x4b));
+  try { mkdirSync('/tmp/alice-office', { recursive: true }); writeFileSync('/tmp/alice-office/t.docx', docx); writeFileSync('/tmp/alice-office/t.xlsx', xlsx); writeFileSync('/tmp/alice-office/t.pptx', pptx); } catch {}
+  const now2 = new Date(2026, 10, 26, 23, 0);
+  const log = [
+    { t: new Date(2026, 10, 25, 9).getTime(), role: 'user' as const, text: 'I drive a 2021 Dodge Charger' },
+    { t: new Date(2026, 10, 25, 9, 1).getTime(), role: 'assistant' as const, text: 'Nice ride.' },
+    { t: new Date(2026, 10, 26, 22).getTime(), role: 'user' as const, text: 'Remind me to call Kylee' },
+    { t: new Date(2026, 10, 26, 22, 5).getTime(), role: 'user' as const, text: 'Make my federal resume' },
+    { t: new Date(2026, 10, 26, 22, 9).getTime(), role: 'user' as const, text: 'What is the weather' },
+  ];
+  check('recall topic', recall(log, 'what did I say about my charger', {}, now2)[0]?.text.includes('Charger'));
+  check('recall last 3 user', recall(log, '', { last: 3, who: 'user' }, now2).length === 3);
+  check('recall yesterday', recall(log, 'yesterday', {}, now2).length === 2);
+  check('date range today', !!dateRange('what did we talk about today', now2));
+  check('open spotify', appUrl('open the Spotify app')?.url === 'spotify://' || appUrl('Spotify')?.url === 'spotify://');
+  check('open my calendar', appUrl('my calendar')?.url === 'calshow://');
+  check('unknown app', appUrl('Fancy Unknown Thing') === null);
+  const g = new NoiseGate();
+  const frame = (amp: number) => Float32Array.from({ length: 1600 }, (_, i) => amp * Math.sin(i / 3));
+  let sent = 0;
+  for (let i = 0; i < 30; i++) sent += g.process(frame(0.02), 1000 + i * 100).length; // steady TV-level noise
+  check('noise gate learns room noise', sent <= 3, sent);
+  const voice = g.process(frame(0.2), 5000);
+  check('noise gate opens for a voice with lead-in', voice.length >= 2, voice.length);
+  check('noise gate holds briefly', g.process(frame(0.0), 5500).length === 1 && g.process(frame(0.0), 7000).length === 0);
+  check('make_file action', (validateAction({ type: 'make_file', kind: 'Excel spreadsheet', request: 'budget' }, modes) as any)?.kind === 'excel');
+  check('recall action', (validateAction({ type: 'recall', last: 3, who: 'user' }, modes) as any)?.last === 3);
+  check('offline open app', (parseOffline('open Spotify') as any)?.action?.name === 'Spotify');
+  check('offline self check', (parseOffline('Alice fix yourself') as any)?.action?.type === 'self_check');
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

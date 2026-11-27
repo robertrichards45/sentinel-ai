@@ -93,3 +93,6 @@ async function setEnabled(on: boolean) {
 
 onSettings((s) => { setEnabled(!!s.heyAlice); });
 export const wakeWordReady = () => setEnabled(!!getSettings().heyAlice);
+/** For self-repair: is "Hey Alice" supposed to be on, and has it been idle (not listening) too long? */
+export const wakeWordHealth = () => ({ enabled, running, idleMs: running ? 0 : Date.now() - startedAt, busy: aliceBusy(), paused: Date.now() < pauseUntil });
+export function restartWakeWord() { stop(); pauseUntil = 0; quickFails = 0; setTimeout(() => { if (enabled && !aliceBusy()) start(); }, 300); }

@@ -12,6 +12,8 @@ import { respond } from './ai';
 import { memory } from './memory';
 import { fileNameFor } from './docCore';
 import { note } from './diary';
+import { setLastAttachment } from './attachments';
+import { Buffer } from 'buffer';
 
 const OCR = 'Transcribe ALL the text on this document page exactly as written, in reading order. Keep line breaks and lists. No commentary. If there is no text, reply [no text].';
 const ask = (title: string, msg: string) => new Promise<boolean>((resolve) =>
@@ -56,6 +58,7 @@ export async function scanDocument(): Promise<string> {
   if (all) { const txt = new File(dir, `${base}.txt`); txt.create(); await txt.write(`${title}\n\n${all}`); }
   let thumb: string | undefined;
   try { const pd = new Directory(Paths.document, 'Alice Photos'); if (!pd.exists) pd.create(); const t = new File(pd, `${Date.now()}.jpg`); new File(pages[0].uri).copy(t); thumb = t.uri; } catch {}
+  if (all) setLastAttachment({ mime: 'text/plain', name: `${title}.txt`, base64: Buffer.from(`${title}\n\n${all}`, 'utf8').toString('base64') });
   await memory.note(`Scanned "${title}" (${pages.length} page${pages.length > 1 ? 's' : ''}): ${summary || all.slice(0, 300)}`, thumb);
   note('scan', { pages: pages.length, chars: all.length });
   return `Scanned ${pages.length} page${pages.length > 1 ? 's' : ''}: ${title}. ${summary} It's saved as a PDF in Files, On My iPhone, Alice, Alice Documents.`.replace(/\s+/g, ' ').trim();

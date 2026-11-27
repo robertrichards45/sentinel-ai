@@ -1,5 +1,6 @@
 import { readJson, writeJson, deleteFile } from './storage';
 import * as core from './memoryCore';
+import { logTurn, wipeLog } from './convoLog';
 
 let state: core.MemoryState = core.EMPTY;
 const listeners = new Set<(m: core.MemoryState) => void>();
@@ -16,9 +17,9 @@ export const memory = {
   async forget(match: string) { const r = core.forget(state, match); state = r.state; await save(); return r.removed; },
   async note(text: string, image?: string) { state = core.addNote(state, text, Date.now(), image); await save(); },
   async deleteNote(id: string) { state = { ...state, notes: state.notes.filter((n) => n.id !== id) }; await save(); },
-  async turn(role: core.Turn['role'], text: string) { state = core.addTurn(state, role, text); await save(); },
+  async turn(role: core.Turn['role'], text: string) { state = core.addTurn(state, role, text); logTurn(role, text).catch(() => {}); await save(); },
   async clearHistory() { state = { ...state, history: [] }; await save(); },
   /** Privacy: wipe everything Alice remembers. */
-  async wipeAll() { state = core.EMPTY; deleteFile('memory.json'); listeners.forEach((l) => l(state)); },
+  async wipeAll() { state = core.EMPTY; deleteFile('memory.json'); wipeLog(); listeners.forEach((l) => l(state)); },
   prompt: () => core.memoryPrompt(state),
 };

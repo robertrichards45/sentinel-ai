@@ -28,6 +28,10 @@ export type Action =
   | { type: 'scan_doc' }
   | { type: 'undo_last' }
   | { type: 'learn_word'; word: string }
+  | { type: 'open_app'; name: string }
+  | { type: 'self_check' }
+  | { type: 'recall'; query: string; last?: number; who?: 'user' | 'assistant' | 'any' }
+  | { type: 'make_file'; kind: 'word' | 'pdf' | 'excel' | 'powerpoint'; request: string; title?: string }
   | { type: 'photo_file'; target: 'auto' | 'note' | 'calendar' | 'reminder'; fromLibrary?: boolean }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
@@ -87,6 +91,16 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'daily_recap': return { type: 'daily_recap' };
     case 'scan_doc': return { type: 'scan_doc' };
     case 'undo_last': return { type: 'undo_last' };
+    case 'make_file': {
+      const k = String(a.kind ?? a.format ?? 'word').toLowerCase();
+      const kind = /xls|excel|sheet|spread/.test(k) ? 'excel' : /ppt|power|slide|deck|present/.test(k) ? 'powerpoint' : /pdf/.test(k) ? 'pdf' : 'word';
+      const request = str(a.request, 4000) || str(a.content, 4000);
+      const title = str(a.title, 120);
+      return request ? { type: 'make_file', kind, request, ...(title ? { title } : {}) } : null;
+    }
+    case 'recall': { const n = Number(a.last); const who = ['user', 'assistant', 'any'].includes(a.who) ? a.who : undefined; return { type: 'recall', query: str(a.query, 200) ?? '', ...(Number.isInteger(n) && n > 0 ? { last: Math.min(30, n) } : {}), ...(who ? { who } : {}) }; }
+    case 'self_check': return { type: 'self_check' };
+    case 'open_app': { const name = str(a.name, 60); return name ? { type: 'open_app', name } : null; }
     case 'learn_word': { const word = str(a.word, 40); return word ? { type: 'learn_word', word } : null; }
     case 'photo_file': { const t = String(a.target ?? 'auto').toLowerCase(); const target = /calendar|event/.test(t) ? 'calendar' : /remind/.test(t) ? 'reminder' : /note/.test(t) ? 'note' : 'auto'; return { type: 'photo_file', target, ...(a.fromLibrary === true ? { fromLibrary: true } : {}) }; }
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
@@ -208,6 +222,11 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"glasses_status"}
 {"type":"agenda","days":7}   what's coming up / what do I have today, this week, on Tuesday (calendar + reminders)
 {"type":"set_mode","mode":"<mode id>"}
+{"type":"recall","query":"truck","last":3,"who":"user"}   search past conversations ("what did I tell you about…", "the last 3 things I sent you", "what did we talk about yesterday"); query optional when using last
+{"type":"self_check"}   "fix yourself", "run a self-check", "something's wrong with you", "repair yourself"
+{"type":"open_app","name":"Spotify"}   "open Spotify / Instagram / my calendar / Uber"
+{"type":"make_file","kind":"word|pdf|excel|powerpoint","request":"exactly what the user wants, with every detail they gave","title":"optional"}
+   PREFERRED for any resume, letter, report, form, spreadsheet, budget, tracker or presentation: it researches any official standard (e.g. federal resume rules) and builds a real Word/Excel/PowerPoint/PDF file. Word if they don't say.
 {"type":"document","title":"...","format":"pdf|text","content":"<the COMPLETE document in Markdown: # title, ## headings, - lists, | tables |>"}
    use when the user asks you to write, create, draft or make a document, letter, report, list, plan, resume or similar.
    Put the whole document in "content"; in "reply" just say briefly what you made (do not read the document aloud).

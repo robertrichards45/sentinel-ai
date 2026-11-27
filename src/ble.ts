@@ -25,6 +25,7 @@ class GlassesLink {
   private subs: Subscription[] = [];
   private listeners = new Set<(e: GlassesEvent | { kind: 'link'; state: LinkState; detail?: string }) => void>();
   private wantConnected = false;
+  get wantsConnection() { return this.wantConnected; }
 
   on(fn: (e: any) => void) {
     this.listeners.add(fn);

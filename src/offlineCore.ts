@@ -42,6 +42,7 @@ export function parseOffline(raw: string, shortcuts: string[] = [], now = new Da
   if (!low) return null;
   if (/\b(i need help|help me|emergency|i'?m hurt|call for help|sos)\b/.test(low)) return { action: { type: 'emergency' } };
   if (/^(yes,? )?call 911$|^call 9 1 1$/.test(low)) return { action: { type: 'call_911' } };
+  if (/\b(fix yourself|self.?check|repair yourself)\b/.test(low)) return { action: { type: 'self_check' } };
   if (/^(undo|undo that|remove that|delete that)$/.test(low)) return { action: { type: 'undo_last' } };
   if (/\b(cancel|stop|clear|delete)\b.*\b(timers?|alarms?)\b/.test(low)) return { action: { type: 'cancel_timers' } };
   if (/\btimer\b/.test(low)) { const s = parseDuration(low); return s ? { action: { type: 'timer', seconds: s } } : { say: 'How long should the timer be?' }; }
@@ -71,6 +72,8 @@ export function parseOffline(raw: string, shortcuts: string[] = [], now = new Da
   if (m) return { action: { type: 'call', who: m[1] } };
   m = t.match(/^(?:text|message|send a text to) (.+?)(?: saying| that|:)\s+(.+)$/i);
   if (m) return { action: { type: 'text', who: m[1], body: m[2] } };
+  m = t.match(/^(?:open|launch|start) (?:the |my )?(.+?)(?: app)?$/i);
+  if (m) return { action: { type: 'open_app', name: m[1] } };
   m = t.match(/^run (?:my |the )?(.+?)(?: shortcut)?$/i);
   if (m) return { action: { type: 'run_shortcut', name: m[1] } };
   const sc = shortcuts.find((s) => low === s.toLowerCase() || low.includes(s.toLowerCase()));

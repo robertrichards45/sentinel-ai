@@ -6,7 +6,7 @@ export type MemoryState = { facts: Fact[]; history: Turn[]; notes: Note[] };
 
 export const EMPTY: MemoryState = { facts: [], history: [], notes: [] };
 export const MAX_FACTS = 200;
-export const MAX_HISTORY = 24; // turns kept for conversational context
+export const MAX_HISTORY = 40; // turns kept for conversational context
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 const id = (now: number) => now.toString(36) + Math.random().toString(36).slice(2, 6);
@@ -48,7 +48,7 @@ export function addTurn(m: MemoryState, role: Turn['role'], text: string, now = 
 
 /** Context block sent with each request. Only facts the user explicitly asked to keep. */
 export function memoryPrompt(m: MemoryState, now = new Date()): string {
-  const lines = [`Current local time: ${now.toString()}`];
+  const lines = [`Current local time: ${now.toString()}`, 'You DO remember past conversations with the user: recent turns are included, and the recall tool / recall action searches everything older. Never say you have no access to previous messages or past conversations.'];
   if (m.facts.length) lines.push('What you know about the user (use it naturally when it helps, e.g. their car for car questions; never recite the list unprompted):\n' + m.facts.map((f) => '- ' + f.text).join('\n'));
   const recentNotes = m.notes.slice(-10);
   if (recentNotes.length) lines.push('Recent notes:\n' + recentNotes.map((n) => '- ' + n.text).join('\n'));

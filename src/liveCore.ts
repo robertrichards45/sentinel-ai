@@ -32,3 +32,30 @@ export function frameText(d: unknown): string {
   if (ArrayBuffer.isView(d)) return Buffer.from(new Uint8Array(d.buffer as ArrayBuffer, d.byteOffset, d.byteLength)).toString('utf8');
   return '';
 }
+
+/**
+ * Background-noise gate for the phone mic: learns the room's steady noise level (TV, fan, traffic) and only
+ * lets sound through that is clearly louder than it — a voice close to the phone. While closed, the AI gets
+ * silence, so it doesn't react to the TV or people nearby. The last ~300 ms before opening are let through
+ * too, so the start of your first word isn't cut.
+ */
+export class NoiseGate {
+  floor = 0.008;
+  private openUntil = 0;
+  private ring: Float32Array[] = [];
+  constructor(private minOpen = 0.018, private ratio = 3, private holdMs = 900, private prefix = 3) {}
+  /** Returns the frames to send (empty while closed). */
+  process(f: Float32Array, now = Date.now()): Float32Array[] {
+    let e = 0; for (let i = 0; i < f.length; i++) e += f[i] * f[i];
+    const rms = Math.sqrt(e / Math.max(1, f.length));
+    const threshold = Math.max(this.minOpen, this.floor * this.ratio);
+    const wasOpen = now < this.openUntil;
+    if (rms > threshold) this.openUntil = now + this.holdMs;
+    else if (!wasOpen) this.floor = Math.min(0.2, rms < this.floor ? this.floor * 0.9 + rms * 0.1 : this.floor * 0.995 + rms * 0.005); // learn the room
+    const open = now < this.openUntil;
+    if (!open) { this.ring.push(f); if (this.ring.length > this.prefix) this.ring.shift(); return []; }
+    const out = wasOpen ? [f] : [...this.ring, f];
+    this.ring = [];
+    return out;
+  }
+}

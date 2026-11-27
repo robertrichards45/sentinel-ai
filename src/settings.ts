@@ -25,6 +25,8 @@ export type Settings = {
   catchUp: boolean; // 'welcome back' summary when the glasses reconnect after 2+ hours
   eveningRecap: boolean; // daily recap notification
   recapHour: number; // 0-23
+  noiseFilter: boolean; // ignore background noise on the phone mic
+  cameraHidden: boolean; // live camera runs without showing the preview
   customWords: string[]; // names/words to bias speech recognition toward
   shortcuts: string[]; // Siri Shortcut names Alice may run
   emergencyContacts: string[]; // names from Contacts, or phone numbers
@@ -61,6 +63,8 @@ export const DEFAULTS: Settings = {
   catchUp: true,
   eveningRecap: false,
   recapHour: 21,
+  noiseFilter: true,
+  cameraHidden: false,
   customWords: [],
   shortcuts: [],
   emergencyContacts: [],

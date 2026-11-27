@@ -9,6 +9,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { ask, Exchange } from '../assistant';
 import { allModes } from '../modeStore';
 import { onListenRequest } from '../triggers';
+import { setLastAttachment } from '../attachments';
 import { offlineNow, checkNet } from '../netState';
 import { offlineTurn } from '../offline';
 import { live, LiveState, LiveLine } from '../live';
@@ -168,6 +169,7 @@ export default function Assist() {
       : ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ['jpg', 'jpeg'].includes(ext) ? 'image/jpeg' : ext === 'md' ? 'text/markdown' : ext === 'csv' ? 'text/csv' : 'text/plain';
     const file: Attachment = { mime: mime.startsWith('text/') && !['text/plain', 'text/markdown', 'text/csv', 'text/html'].includes(mime) ? 'text/plain' : mime, base64: await new File(a.uri).base64(), name: a.name };
     setAttached(file);
+    setLastAttachment(file);
     run({ file });
   };
 
@@ -215,9 +217,12 @@ export default function Assist() {
       </View>
       {attached ? <Text style={[S.dim, { textAlign: 'center' }]} numberOfLines={1}>Ask anything about "{attached.name}". Tap Done to stop.</Text> : null}
 
-      {look ? <LiveCamera onClose={() => setLook(false)} /> : null}
+      {look ? <LiveCamera hidden={s.cameraHidden} onClose={() => setLook(false)} /> : null}
       {s.liveConversation ? (
-        <Btn kind={look ? 'primary' : 'ghost'} icon={look ? 'eye-off-outline' : 'eye-outline'} title={look ? 'Stop showing Alice' : 'Show Alice (live camera)'} onPress={() => setLook(!look)} />
+        <View style={S.row}>
+          <Btn style={{ flex: 1 }} kind={look ? 'primary' : 'ghost'} icon={look ? 'eye-off-outline' : 'eye-outline'} title={look ? 'Stop showing Alice' : 'Show Alice (live camera)'} onPress={() => setLook(!look)} />
+          <Btn kind="ghost" icon={s.cameraHidden ? 'videocam-outline' : 'videocam-off-outline'} title={s.cameraHidden ? 'Show view' : 'Hide view'} onPress={() => updateSettings({ cameraHidden: !s.cameraHidden })} />
+        </View>
       ) : null}
       {mode.wantsImage || liveOn ? (
         <View style={S.row}>
@@ -226,15 +231,16 @@ export default function Assist() {
         </View>
       ) : null}
 
-      <Glass radius={999} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 6 }}>
+      {/* Chat box: hidden while you're talking by voice, back as soon as voice stops. */}
+      {!(liveOn || listening) ? <Glass radius={999} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 18, paddingRight: 6, paddingVertical: 6 }}>
         <TextInput style={{ flex: 1, fontFamily: F.regular, fontSize: 16, color: C.ink, paddingVertical: 8 }} value={typed} onChangeText={setTyped}
           placeholder="Or type to Alice" placeholderTextColor={C.faint} returnKeyType="send" accessibilityLabel="Type a question" keyboardAppearance="dark"
-          onSubmitEditing={() => { if (typed) { liveOn ? live.sendText(typed) : run({ text: typed }); setTyped(''); } }} />
-        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!typed || busy} onPress={() => { liveOn ? live.sendText(typed) : run({ text: typed }); setTyped(''); }}
+          onSubmitEditing={() => { if (typed) { liveOn ? live.sendText(typed, true) : run({ text: typed }); setTyped(''); } }} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!typed || busy} onPress={() => { liveOn ? live.sendText(typed, true) : run({ text: typed }); setTyped(''); }}
           style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: typed && !busy ? C.violet : 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
         </Pressable>
-      </Glass>
+      </Glass> : null}
 
       {err ? (
         <Card tone="alert">
