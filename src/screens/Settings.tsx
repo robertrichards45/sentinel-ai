@@ -168,6 +168,11 @@ export default function Settings() {
         <Text style={S.dim}>Copy a link or some text, then say "Alice, read me this" (or "sum this up"). To read straight from the Share button: in the Shortcuts app, make a shortcut that shows in the Share Sheet, receives URLs and text, runs URL Encode on the Shortcut Input, then opens alice://read?url=[URL Encoded Text]. Name it Read with Alice. Ask me and I'll walk you through it.</Text>
       </Card>
 
+      <Card title="Words Alice should know">
+        <Text style={S.dim}>Names or words she keeps mishearing (like Kylee). She also knows your contacts' names and the people and places you've told her about. You can say "Alice, learn the name Kylee, K-Y-L-E-E."</Text>
+        <NameList items={s.customWords ?? []} onChange={(v) => updateSettings({ customWords: v })} placeholder="e.g. Kylee" />
+      </Card>
+
       <Card title="Siri Shortcuts">
         <Text style={S.dim}>Type the exact names of Shortcuts you want Alice to run (smart-home lights, thermostat, scenes, anything in the Shortcuts app). Then say "Alice, lights off".</Text>
         <NameList items={s.shortcuts ?? []} onChange={(v) => updateSettings({ shortcuts: v })} placeholder="e.g. Lights Off" />

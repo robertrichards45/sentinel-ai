@@ -1,3 +1,4 @@
+import { vocabHint } from './vocab';
 import { checkNet } from './netState';
 import { note, setDiarySender } from './diary';
 import { File } from 'expo-file-system';
@@ -66,13 +67,19 @@ export async function audioOf(fileUri: string): Promise<{ mime: string; base64: 
 }
 
 /** Speech-to-text for audio already in memory (e.g. the glasses' microphone as Ogg Opus). */
+/** Businesses / places matching a name near a point, nearest first. */
+export async function placesNear(q: string, lat?: number, lon?: number): Promise<{ name: string; address: string; lat: number; lon: number }[]> {
+  const j = await call('/v1/places', { q, lat, lon }, 20000);
+  return Array.isArray(j.places) ? j.places : [];
+}
+
 /** Readable text of a public web page, fetched by Alice's server. */
 export async function readUrl(url: string): Promise<{ title: string; text: string }> {
   return call('/v1/read', { url }, 25000);
 }
 
 export async function transcribeAudio(audio: { mime: string; base64: string }): Promise<string> {
-  const j = await call('/v1/transcribe', { audioBase64: audio.base64, mime: audio.mime }, 45000);
+  const j = await call('/v1/transcribe', { audioBase64: audio.base64, mime: audio.mime, hint: vocabHint(150) }, 45000);
   return String(j.text ?? '').trim();
 }
 
@@ -80,7 +87,7 @@ export async function transcribeAudio(audio: { mime: string; base64: string }): 
 export async function transcribe(fileUri: string): Promise<string> {
   const audioBase64 = await new File(fileUri).base64();
   const mime = /\.wav$/i.test(fileUri) ? 'audio/wav' : 'audio/m4a';
-  const j = await call('/v1/transcribe', { audioBase64, mime }, 45000);
+  const j = await call('/v1/transcribe', { audioBase64, mime, hint: vocabHint(150) }, 45000);
   return String(j.text ?? '').trim();
 }
 

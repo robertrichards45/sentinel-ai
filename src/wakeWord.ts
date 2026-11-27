@@ -10,6 +10,7 @@ import { getSettings, onSettings } from './settings';
 import { appMicBusy } from './micState';
 import { onSpeaking } from './voice';
 import { live } from './live';
+import './keepAlive';
 import { glassesVoiceActive } from './glassesVoice';
 import { wake } from './triggers';
 import { note } from './diary';
@@ -66,7 +67,10 @@ ExpoSpeechRecognitionModule.addListener('result', (ev: any) => {
 function ended() {
   running = false;
   if (Date.now() - startedAt < 5000) quickFails++; else quickFails = 0;
-  if (quickFails >= 3) { pauseUntil = Date.now() + 60000; note('wake-paused', { quickFails }); quickFails = 0; }
+  if (quickFails >= 3) { pauseUntil = Date.now() + 60000; note('wake-paused', { quickFails }); quickFails = 0; return; }
+  // iOS ends each session after about a minute. Restart right away (in the background a 1-second wait can
+  // be long enough for iOS to suspend the app).
+  setTimeout(() => { if (enabled && !aliceBusy()) start(); }, 200);
 }
 ExpoSpeechRecognitionModule.addListener('end', ended);
 ExpoSpeechRecognitionModule.addListener('error', (e: any) => { ended(); if (e?.error && e.error !== 'no-speech' && e.error !== 'aborted') note('wake-error', { error: e.error, msg: e.message }); });

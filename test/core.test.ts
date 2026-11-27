@@ -315,6 +315,10 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('photo forced note', parsePhotoFiling('{"kind":"event","title":"X","start":"2026-12-03T14:30:00-05:00","text":"x"}', 'note')?.kind === 'note');
   check('photo reminder', (parsePhotoFiling('{"kind":"reminder","title":"Pay water bill","due":"2026-12-10T09:00:00-05:00"}', 'auto') as any)?.due === '2026-12-10T09:00:00-05:00');
   check('photo junk', parsePhotoFiling('I cannot see anything', 'auto') === null);
+  check('directions choice kept', (validateAction({ type: 'directions', to: 'Walmart', choice: 2 }, modes) as any)?.choice === 2);
+  check('learn_word action', (validateAction({ type: 'learn_word', word: 'Kylee' }, modes) as any)?.word === 'Kylee');
+  check('undo action', (validateAction({ type: 'undo_last' }, modes) as any)?.type === 'undo_last');
+  check('offline undo', (parseOffline('undo', []) as any)?.action?.type === 'undo_last');
   check('scan_doc action', (validateAction({ type: 'scan_doc' }, modes) as any)?.type === 'scan_doc');
   check('photo_file target', (validateAction({ type: 'photo_file', target: 'my calendar' }, modes) as any)?.target === 'calendar');
 }

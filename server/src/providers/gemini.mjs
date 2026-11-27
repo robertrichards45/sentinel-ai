@@ -45,11 +45,12 @@ export async function respond({ model, system, history, text, imageBase64, searc
   return { text: textOf(j), usage: usage(j), sources: sources(j) };
 }
 
-export async function transcribe({ audioBase64, mime }) {
+export async function transcribe({ audioBase64, mime, hint }) {
   const model = config.models.gemini.transcribe;
+  const vocab = hint ? ` Names and words this person often says (spell them this way when the audio sounds close): ${hint}.` : '';
   const j = await call(model, {
     contents: [{ role: 'user', parts: [
-      { text: 'Transcribe this speech exactly as spoken, in the language spoken. Return only the transcript, no notes. If there is no speech, return an empty string.' },
+      { text: 'Transcribe this speech exactly as spoken, in the language spoken. Return only the transcript, no notes. If there is no speech, return an empty string.' + vocab },
       { inline_data: { mime_type: mime, data: audioBase64 } },
     ] }],
   }, 45000);

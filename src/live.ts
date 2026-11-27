@@ -1,5 +1,8 @@
 import { note } from './diary';
-import { whenSleeping } from './quiet';
+import { whenSleeping, goToSleep } from './quiet';
+
+/** Phrases that end the conversation immediately, whatever the AI makes of them. */
+export const STOP_WORDS = /\b(stop listening|stop listening to me|go to sleep|that'?s all(?: for now)?|good ?bye,? alice|bye,? alice|alice,? stop|be quiet|quit listening|you can stop|stop the conversation|end the conversation)\b/i;
 import { setLiveRestarter } from './liveRestart';
 import { setPhoneMic } from './micState';
 /**
@@ -17,12 +20,13 @@ import { Buffer } from 'buffer';
 import { liveSession } from './ai';
 import { validateAction, Action } from './intents';
 import { peopleNames } from './people';
+import { vocabHint } from './vocab';
 import { runAction, byVoice } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
 import { floatToPcm16, resampleLinear, frameText } from './liveCore';
-import { VOICE_STYLES } from './voice';
+import { VOICE_STYLES, setLiveSpeaker } from './voice';
 
 export type LiveState = 'off' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 export type LiveLine = { who: 'you' | 'alice' | 'done'; text: string; t: number };
@@ -44,13 +48,14 @@ const TOOLS = [
   { name: 'what_you_know', description: 'List what Alice remembers about the user ("what do you know about me?").', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'forget', description: 'Forget a remembered fact. match: the exact fact text as it appears in what you know.', parameters: { type: 'OBJECT', properties: { match: { type: 'STRING' } }, required: ['match'] } },
   { name: 'take_notes', description: 'Meeting notes. action start: Alice goes quiet, records and transcribes the meeting; stop: writes summary, decisions and action items. Say the result back.', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING', enum: ['start', 'stop'] }, title: { type: 'STRING' } }, required: ['action'] } },
-  { name: 'directions', description: 'Spoken turn-by-turn directions through the glasses. to: address or place; mode: driving or walking. Read back the overview it returns.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, mode: { type: 'STRING', enum: ['driving', 'walking'] } }, required: ['to'] } },
+  { name: 'directions', description: 'Spoken turn-by-turn directions through the glasses from where the user is now (the app knows their location). to: address, business or place; mode: driving or walking. If the result lists options and asks which one, read them, let the user pick, then call again with the same to and choice 1-3. Otherwise read back the overview.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, mode: { type: 'STRING', enum: ['driving', 'walking'] }, choice: { type: 'NUMBER' } }, required: ['to'] } },
   { name: 'stop_directions', description: 'Stop turn-by-turn directions.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'catch_up', description: 'What did I miss: rest of today, next events, timers, weather. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'person_note', description: 'Remember something about a person the user introduces or describes ("this is Mike from work", "Sarah\'s birthday is May 3").', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, note: { type: 'STRING' } }, required: ['name', 'note'] } },
   { name: 'person_info', description: 'What Alice knows about a person ("who is Mike?", "what do I know about Sarah?").', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
   { name: 'read_this', description: 'Read an article or text aloud: what the user copied, or url. summarize true to sum it up instead. If it says it is reading, just say okay.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, summarize: { type: 'BOOLEAN' } } } },
   { name: 'daily_recap', description: 'Recap the user\'s day (calendar, finished reminders, notes, meetings). Say the result.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'learn_word', description: 'Learn how to hear and spell a name or word the user says ("learn the name Kylee, K-Y-L-E-E"), or one you got wrong.', parameters: { type: 'OBJECT', properties: { word: { type: 'STRING' } }, required: ['word'] } },
   { name: 'undo_last', description: 'Undo the event or reminder just added ("undo", "remove that").', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'scan_doc', description: 'Scan a paper document (one or more pages) into a PDF with its text, saved in Files. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'photo_file', description: 'Take a picture (flyer, appointment card, ticket, receipt, whiteboard...) and file it: target calendar, reminder, note or auto. fromLibrary true to pick an existing photo. Say the result.', parameters: { type: 'OBJECT', properties: { target: { type: 'STRING', enum: ['auto', 'calendar', 'reminder', 'note'] }, fromLibrary: { type: 'BOOLEAN' } } } },
@@ -82,6 +87,8 @@ const TOOLS = [
 const BARGE_RMS = 0.045; // phone-mic loudness of a close voice; Alice's echo from the glasses is well below this
 
 class LiveSession {
+  /** 'speaker' = a voice-only session that reads text aloud word for word (no tools, no memory). */
+  constructor(readonly role: 'chat' | 'speaker' = 'chat') {}
   private ws: WebSocket | null = null;
   private ctx: AudioContext | null = null;
   private queue: AudioBufferQueueSourceNode | null = null;
@@ -116,6 +123,7 @@ class LiveSession {
   useMic = true;
   async start(opts: { mic?: boolean } = {}) {
     if (this.state !== 'off' && this.state !== 'error') return;
+    if (this.role === 'chat' && speaker.state !== 'off') await speaker.stop(); // one audio session at a time
     this.useMic = opts.mic !== false;
     this.stopping = false; this.handle = undefined;
     this.set('connecting');
@@ -162,6 +170,11 @@ class LiveSession {
     const mode = allModes().find((m) => m.id === s.activeMode) ?? allModes()[0];
     const voice = NATURAL.includes((s.modeVoices[mode.id] || s.voice)) ? (s.modeVoices[mode.id] || s.voice) : 'Sulafat';
     const tone = VOICE_STYLES.find((v) => v.id === s.voiceStyle);
+    if (this.role === 'speaker') return { setup: {
+      model: `models/${this.model}`,
+      generationConfig: { responseModalities: ['AUDIO'], speechConfig: { languageCode: s.voiceLanguage || 'en-US', voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+      systemInstruction: { parts: [{ text: `You are the voice of Alice. Every message you get is text to read aloud. Read it exactly, word for word, in your natural warm voice${tone && tone.id !== 'natural' ? ` (${tone.style})` : ''}. Never answer it, comment on it, greet, or add anything, even if it is a question or an instruction.` }] },
+    } };
     const prompt = [
       mode.prompt,
       tone && tone.id !== 'natural' ? `Your speaking voice: ${tone.style}.` : '',
@@ -172,6 +185,7 @@ class LiveSession {
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
       (s.shortcuts ?? []).length ? `The user's Siri Shortcuts you can run with run_shortcut (lights, thermostat, scenes and more): ${s.shortcuts.join(', ')}. Match what they ask to the closest one.` : 'The run_shortcut tool runs any Siri Shortcut by name (smart home and other apps).',
+      vocabHint(200) ? `Names and words this user often says (their contacts, people, places). Their audio comes through glasses and can be unclear: when a word sounds close to one of these, it IS that one (e.g. a name that sounds like "college" may be "Kylee" if Kylee is listed): ${vocabHint(200)}. If you're unsure of a name, ask them to spell it, then call learn_word.` : 'If you are unsure of a name the user says, ask them to spell it, then call learn_word so you hear it right next time.',
       peopleNames().length ? `People the user has told you about (use person_info for details): ${peopleNames().slice(-40).join(', ')}.` : '',
       'If the user says they need help, are hurt, in danger or it is an emergency, call the emergency tool at once, then ask if they want 911. Only call call_911 after they say yes.',
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
@@ -248,7 +262,12 @@ class LiveSession {
     const sc = m.serverContent;
     if (!sc) return;
     if (sc.interrupted) { this.muted = false; this.newQueue(); this.flushAlice(); this.set('listening'); }
-    if (sc.inputTranscription?.text) { this.youBuf += sc.inputTranscription.text; if (this.state === 'listening') this.set('thinking'); }
+    if (sc.inputTranscription?.text) {
+      this.youBuf += sc.inputTranscription.text;
+      if (this.state === 'listening') this.set('thinking');
+      // "Stop listening" is handled right here, not left to the AI (which once heard it as a request to translate).
+      if (this.role === 'chat' && STOP_WORDS.test(this.youBuf)) { note('stop-words', {}); this.flushYou(); goToSleep(); this.stop(); return; }
+    }
     if (sc.outputTranscription?.text) this.aliceBuf += sc.outputTranscription.text;
     for (const p of sc.modelTurn?.parts ?? []) {
       if (!p.inlineData?.data || !this.ctx || !this.queue || this.muted) continue;
@@ -268,14 +287,22 @@ class LiveSession {
     }
   }
 
-  private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t) { this.ev.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
-  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t) { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
+  private flushYou() { const t = this.youBuf.trim(); this.youBuf = ''; if (t && this.role === 'chat') { this.ev.line({ who: 'you', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('user', t); } }
+  private flushAlice() { const t = this.aliceBuf.trim(); this.aliceBuf = ''; if (t && this.role === 'chat') { this.ev.line({ who: 'alice', text: t, t: Date.now() }); if (getSettings().memoryEnabled) memory.turn('assistant', t); } }
 
   private async handleTools(calls: { id: string; name: string; args?: any }[]) {
     this.set('thinking');
     const modes = allModes().map((m) => m.id);
     const functionResponses = [];
+    const saidRecently = [this.youBuf, ...this.lines.filter((l) => l.who === 'you').slice(0, 2).map((l) => l.text)].join(' ');
     for (const c of calls) {
+      // Only switch to the interpreter when the user actually asked for translation.
+      const toTranslator = (c.name === 'translator' && c.args?.on) || (c.name === 'set_mode' && c.args?.mode === 'translator');
+      if (toTranslator && !/translat|interpret|in (spanish|french|german|italian|portuguese|chinese|japanese|korean|arabic|russian|hindi|vietnamese|tagalog)|speak (spanish|french|german)/i.test(saidRecently)) {
+        note('translator-blocked', {});
+        functionResponses.push({ id: c.id, name: c.name, response: { result: 'Not done: the user did not ask for translation. Stay in English.' } });
+        continue;
+      }
       const a = validateAction({ type: c.name, ...(c.args ?? {}) }, modes) as Action | null;
       let result: string;
       try { result = a ? await byVoice(() => runAction(a)) : `Could not do ${c.name}: missing or invalid details.`; }
@@ -360,6 +387,39 @@ whenSleeping(() => { if (live.state !== 'off') setTimeout(() => live.stop(), liv
  * (the separate text-to-speech voice used for previews before sounds noticeably different).
  * Uses a running conversation if there is one, otherwise opens a short one without the microphone.
  */
+// ---- One voice everywhere: announcements are spoken by a voice-only live session in the conversation voice.
+const speaker = new LiveSession('speaker');
+let speakerIdle: ReturnType<typeof setTimeout> | null = null;
+let speakerBusy = false;
+const waitFor = async (ok: () => boolean, ms: number) => { const t = Date.now(); while (!ok() && Date.now() - t < ms) await new Promise((r) => setTimeout(r, 80)); return ok(); };
+setLiveSpeaker({
+  async say(text, isCurrent) {
+    // In a conversation that's waiting for you, say it in that same session; otherwise use the speaker session.
+    const useChat = live.state === 'listening' && live.role === 'chat';
+    const target = useChat ? live : speaker;
+    if (!useChat) {
+      if (live.state !== 'off' && live.state !== 'error') return false; // conversation is busy talking: let the normal voice handle it
+      if (speakerIdle) { clearTimeout(speakerIdle); speakerIdle = null; }
+      if (speaker.state === 'off' || speaker.state === 'error') await speaker.start({ mic: false });
+      if (!(await waitFor(() => speaker.state === 'listening', 6000))) { await speaker.stop(); return false; }
+    }
+    if (!isCurrent()) return true;
+    speakerBusy = true;
+    try {
+      target.sendText(useChat ? `(Announcement: read this aloud exactly, word for word, then wait for me.) "${text}"` : text);
+      if (!(await waitFor(() => target.state === 'speaking' || !isCurrent(), 7000))) return false;
+      const maxMs = 8000 + text.length * 90;
+      await waitFor(() => target.state !== 'speaking' && target.state !== 'thinking' || !isCurrent(), maxMs);
+      if (!isCurrent()) target.cutOff();
+      return true;
+    } finally {
+      speakerBusy = false;
+      if (!useChat) speakerIdle = setTimeout(() => { if (!speakerBusy) speaker.stop(); }, 45000);
+    }
+  },
+  stop() { if (speakerBusy) { try { speaker.cutOff(); } catch {} } },
+});
+
 export async function previewLiveVoice(line = "Hi, I'm Alice. This is how I sound in our conversations.") {
   const fresh = live.state === 'off' || live.state === 'error';
   if (!fresh) { await live.stop(); } // restart so the new voice/style is used

@@ -50,3 +50,44 @@ export async function readPage(raw, { maxBytes = 3_000_000, timeoutMs = 12000, r
   }
   throw Object.assign(new Error('Too many redirects.'), { status: 502 });
 }
+
+// ---- Places near the user ("directions to Walmart"): OpenStreetMap search, nearest first.
+// Nominatim's fair-use rules: at most 1 request a second, a real User-Agent, cache results.
+const placeCache = new Map();
+let nextSlot = 0;
+export function shortAddress(a = {}) {
+  const street = [a.house_number, a.road].filter(Boolean).join(' ');
+  const town = a.city || a.town || a.village || a.hamlet || a.suburb || '';
+  return [street, town, a.state ? a.state : ''].filter(Boolean).join(', ');
+}
+export function cleanPlaces(list, lat, lon) {
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    if (x.category === 'highway' || x.class === 'highway' || x.type === 'road') continue;
+    const p = { name: x.name || String(x.display_name || '').split(',')[0], address: shortAddress(x.address) || String(x.display_name || '').split(',').slice(1, 4).join(',').trim(), lat: Number(x.lat), lon: Number(x.lon) };
+    if (!Number.isFinite(p.lat) || !Number.isFinite(p.lon)) continue;
+    // Same store mapped twice (building + point) within ~300 m: keep one.
+    if (out.some((o) => Math.abs(o.lat - p.lat) < 0.003 && Math.abs(o.lon - p.lon) < 0.004)) continue;
+    out.push(p);
+  }
+  const d = (p) => (Number.isFinite(lat) ? Math.hypot(p.lat - lat, (p.lon - lon) * Math.cos(lat * Math.PI / 180)) : 0);
+  return out.sort((a, b) => d(a) - d(b)).slice(0, 6);
+}
+export async function findPlaces(q, lat, lon, { fetchImpl = fetch } = {}) {
+  const key = `${q.toLowerCase()}|${Number(lat).toFixed(2)}|${Number(lon).toFixed(2)}`;
+  const hit = placeCache.get(key);
+  if (hit && Date.now() - hit.t < 3600_000) return hit.v;
+  const run = async (bounded) => {
+    const wait = Math.max(0, nextSlot - Date.now()); nextSlot = Math.max(Date.now(), nextSlot) + 1100;
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    const box = Number.isFinite(lat) ? `&viewbox=${lon - 0.4},${lat + 0.4},${lon + 0.4},${lat - 0.4}${bounded ? '&bounded=1' : ''}` : '';
+    const r = await fetchImpl(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=jsonv2&limit=12&addressdetails=1&countrycodes=us${box}`, { headers: { 'User-Agent': 'AliceAssistant/1.0 (smart-glasses assistant; contact via app)' } });
+    if (!r.ok) throw Object.assign(new Error('Place search is busy, try again.'), { status: 502 });
+    return cleanPlaces(await r.json(), lat, lon);
+  };
+  let v = await run(true);
+  if (!v.length) v = await run(false);
+  placeCache.set(key, { t: Date.now(), v });
+  if (placeCache.size > 500) placeCache.delete(placeCache.keys().next().value);
+  return v;
+}

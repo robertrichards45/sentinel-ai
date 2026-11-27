@@ -7,7 +7,7 @@
  */
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { resolvePlace, Place } from './places';
+import { placeOptions, describeOptions, here as whereAmI, Place } from './places';
 import { newNav, navUpdate, overview, stepsFromOsrm, NavMode, NavState, LatLon } from './navCore';
 import { speak, enablePlaybackSession } from './voice';
 import { note } from './diary';
@@ -57,11 +57,26 @@ TaskManager.defineTask(TASK, async ({ data, error }: any) => {
   if (loc) await onFix({ lat: loc.coords.latitude, lon: loc.coords.longitude });
 });
 
-export async function startDirections(to: string, mode: NavMode = 'driving'): Promise<string> {
-  const place = await resolvePlace(to);
-  if (!place) return `I couldn't find "${to}". Try the full address.`;
-  const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-  const here = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+let choices: { to: string; opts: Place[] } | null = null;
+
+export async function startDirections(to: string, mode: NavMode = 'driving', choice?: number): Promise<string> {
+  let place: Place | undefined;
+  if (choice && choices?.opts[choice - 1]) place = choices.opts[choice - 1];
+  else {
+    const opts = await placeOptions(to);
+    if (!opts.length) return `I couldn't find "${to}" near you. Try the street address or the town.`;
+    // Several within reach (e.g. three Walmarts): ask which one instead of guessing.
+    const near = opts.filter((o) => o.miles === undefined || o.miles < 40);
+    if (near.length > 1 && !choice) {
+      choices = { to, opts: near.slice(0, 3) };
+      return `I found ${near.length > 3 ? 'several' : near.length} near you: ${describeOptions(near)}. Which one?`;
+    }
+    place = (near[0] ?? opts[0]);
+  }
+  choices = null;
+  const me = await whereAmI();
+  if (!me) return "I can't tell where you are right now. Check that Location is on for Alice, then try again.";
+  const here = me;
   let rt;
   try { rt = await route(here, place, mode); } catch { return "I couldn't get a route there right now. Check your signal and try again."; }
   await stopDirections(true);
@@ -81,7 +96,7 @@ export async function startDirections(to: string, mode: NavMode = 'driving'): Pr
   if (!pocket) fg = await Location.watchPositionAsync(opts, (p) => onFix({ lat: p.coords.latitude, lon: p.coords.longitude }));
   note('nav-start', { mode, steps: rt.steps.length, km: Math.round(rt.meters / 100) / 10, pocket });
   changed();
-  return overview(rt.steps, place.title, rt.meters, rt.mins) + (pocket ? '' : ' Keep me open on screen. To use directions with the phone in your pocket, allow location "Always" for Alice in Settings.');
+  return overview(rt.steps, place.address ? `${place.title} on ${place.address.split(',')[0]}` : place.title, rt.meters, rt.mins) + (pocket ? '' : ' Keep me open on screen. To use directions with the phone in your pocket, allow location "Always" for Alice in Settings.');
 }
 
 export async function stopDirections(quiet = false): Promise<string> {

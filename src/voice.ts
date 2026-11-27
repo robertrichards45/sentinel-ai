@@ -162,6 +162,15 @@ async function playWav(base64: string, gen: number): Promise<void> {
   });
 }
 
+/**
+ * Alice's conversation voice (Gemini live) and the separate text-to-speech voice sound slightly different
+ * even with the same name. live.ts registers a speaker that says announcements in the conversation voice,
+ * so everything (timers, reading, recaps, the Settings preview) sounds like the conversation.
+ */
+type LiveSpeaker = { say: (text: string, isCurrent: () => boolean) => Promise<boolean>; stop: () => void };
+let liveSpeaker: LiveSpeaker | null = null;
+export const setLiveSpeaker = (s: LiveSpeaker) => { liveSpeaker = s; };
+
 export function speak(text: string, language?: string, modeId?: string): Promise<void> {
   const s = getSettings();
   const voice = (modeId && s.modeVoices[modeId]) || s.voice;
@@ -172,6 +181,10 @@ export function speak(text: string, language?: string, modeId?: string): Promise
   const run = async () => {
     await enablePlaybackSession();
     if (gen !== generation) return;
+    if (voice !== 'iphone' && !s.privacyMode && !offlineNow() && liveSpeaker && (!language || language === s.voiceLanguage)) {
+      try { if (await liveSpeaker.say(text.slice(0, 3000), () => gen === generation)) return; } catch {}
+      if (gen !== generation) return;
+    }
     if (voice !== 'iphone' && !s.privacyMode && !offlineNow()) {
       const style = styleFor(s.voiceStyle, s.speechRate, s.voicePitch);
       const [first, rest] = splitForSpeech(text.slice(0, 3000));
@@ -198,6 +211,7 @@ export function speak(text: string, language?: string, modeId?: string): Promise
 
 function stopPlayback() {
   Speech.stop();
+  try { liveSpeaker?.stop(); } catch {}
   const p: any = player;
   if (p) { try { p.pause(); } catch {} p.__finish?.(); }
 }

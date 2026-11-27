@@ -1,6 +1,7 @@
 import { respond, transcribe, transcribeAudio, audioOf, Source, Attachment } from './ai';
 import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
 import { runAction, byVoice } from './actions';
+import { vocabHint } from './vocab';
 import { memory } from './memory';
 import { getSettings } from './settings';
 import { allModes } from './modeStore';
@@ -45,7 +46,7 @@ export async function ask(opts: { text?: string; audioUri?: string; audioData?: 
     return { you, alice: out.text, outcomes: [], mode: mode.id, t: Date.now(), via: `${out.provider} · ${out.model}`, ms: out.ms };
   }
 
-  const instructions = [mode.prompt, ACTION_SCHEMA_PROMPT, `Available modes: ${allModes().map((m) => m.id).join(', ')}`, s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`].join('\n\n');
+  const instructions = [mode.prompt, ACTION_SCHEMA_PROMPT, vocabHint(200) ? `Names and words this user often says; if what you hear sounds close to one, it is that one: ${vocabHint(200)}.` : '', `Available modes: ${allModes().map((m) => m.id).join(', ')}`, s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`].join('\n\n');
   const history = s.memoryEnabled ? memory.get().history.map((h) => ({ role: h.role, text: h.text })) : [];
   const question = you || (audio ? '' : opts.file ? `Read "${opts.file.name}" to me and tell me what it is.` : mode.wantsImage ? 'What do you see?' : '');
   const ans = await respond(mode.id, instructions, history, question, opts.imageBase64, opts.file, audio);

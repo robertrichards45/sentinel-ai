@@ -25,6 +25,7 @@ export type Settings = {
   catchUp: boolean; // 'welcome back' summary when the glasses reconnect after 2+ hours
   eveningRecap: boolean; // daily recap notification
   recapHour: number; // 0-23
+  customWords: string[]; // names/words to bias speech recognition toward
   shortcuts: string[]; // Siri Shortcut names Alice may run
   emergencyContacts: string[]; // names from Contacts, or phone numbers
   heyAlice: boolean; // listen for "Hey Alice" (on-device, phone mic, while Alice is open or in the background)
@@ -60,6 +61,7 @@ export const DEFAULTS: Settings = {
   catchUp: true,
   eveningRecap: false,
   recapHour: 21,
+  customWords: [],
   shortcuts: [],
   emergencyContacts: [],
   heyAlice: false,

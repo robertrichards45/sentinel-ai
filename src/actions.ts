@@ -1,3 +1,4 @@
+import { learnWord } from './vocab';
 import { AppState } from 'react-native';
 import { scanDocument } from './docScan';
 import { photoToPlanner } from './photoFile';
@@ -215,7 +216,7 @@ export async function runAction(a: Action): Promise<string> {
       return r.text || 'I could not find anything on that.';
     }
     case 'take_notes': return a.action === 'stop' ? stopNotes() : startNotes(a.title);
-    case 'directions': return startDirections(a.to, a.mode);
+    case 'directions': return startDirections(a.to, a.mode, a.choice);
     case 'stop_directions': return stopDirections();
     case 'run_shortcut': return runShortcut(a.name);
     case 'list_add': return addToList(a.list, a.items);
@@ -228,6 +229,7 @@ export async function runAction(a: Action): Promise<string> {
     case 'person_info': return personInfo(a.name);
     case 'read_this': return readThis({ url: a.url, summarize: a.summarize });
     case 'daily_recap': return recapText();
+    case 'learn_word': return learnWord(a.word);
     case 'undo_last': {
       if (!lastMade) return "There's nothing for me to undo.";
       const m = lastMade; lastMade = null;

@@ -12,7 +12,7 @@ export type Action =
   | { type: 'place_reminder'; title: string; place: string; when: 'arrive' | 'leave' }
   | { type: 'what_you_know' }
   | { type: 'take_notes'; action: 'start' | 'stop'; title?: string }
-  | { type: 'directions'; to: string; mode: 'driving' | 'walking' }
+  | { type: 'directions'; to: string; mode: 'driving' | 'walking'; choice?: number }
   | { type: 'stop_directions' }
   | { type: 'run_shortcut'; name: string }
   | { type: 'list_add'; list: string; items: string[] }
@@ -27,6 +27,7 @@ export type Action =
   | { type: 'daily_recap' }
   | { type: 'scan_doc' }
   | { type: 'undo_last' }
+  | { type: 'learn_word'; word: string }
   | { type: 'photo_file'; target: 'auto' | 'note' | 'calendar' | 'reminder'; fromLibrary?: boolean }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
@@ -66,7 +67,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'place_reminder': { const title = str(a.title, 200), place = str(a.place, 200); return title && place ? { type: 'place_reminder', title, place, when: a.when === 'leave' ? 'leave' : 'arrive' } : null; }
     case 'what_you_know': return { type: 'what_you_know' };
     case 'take_notes': { const title = str(a.title, 80); return { type: 'take_notes', action: a.action === 'stop' ? 'stop' : 'start', ...(title ? { title } : {}) }; }
-    case 'directions': { const to = str(a.to, 200); return to ? { type: 'directions', to, mode: /walk|foot/i.test(String(a.mode ?? '')) ? 'walking' : 'driving' } : null; }
+    case 'directions': { const to = str(a.to, 200); const ch = Number(a.choice); return to ? { type: 'directions', to, mode: /walk|foot/i.test(String(a.mode ?? '')) ? 'walking' : 'driving', ...(Number.isInteger(ch) && ch >= 1 && ch <= 3 ? { choice: ch } : {}) } : null; }
     case 'stop_directions': return { type: 'stop_directions' };
     case 'run_shortcut': { const name = str(a.name, 100); return name ? { type: 'run_shortcut', name } : null; }
     case 'list_add': {
@@ -86,6 +87,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'daily_recap': return { type: 'daily_recap' };
     case 'scan_doc': return { type: 'scan_doc' };
     case 'undo_last': return { type: 'undo_last' };
+    case 'learn_word': { const word = str(a.word, 40); return word ? { type: 'learn_word', word } : null; }
     case 'photo_file': { const t = String(a.target ?? 'auto').toLowerCase(); const target = /calendar|event/.test(t) ? 'calendar' : /remind/.test(t) ? 'reminder' : /note/.test(t) ? 'note' : 'auto'; return { type: 'photo_file', target, ...(a.fromLibrary === true ? { fromLibrary: true } : {}) }; }
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
@@ -169,7 +171,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"place_reminder","title":"Take out the trash","place":"home","when":"arrive"}   "remind me when I get home / leave work / get to Walmart"
 {"type":"what_you_know"}   "what do you know about me?"
 {"type":"take_notes","action":"start","title":"Budget meeting"}   "take notes", "record this meeting"; action "stop" for "stop taking notes"
-{"type":"directions","to":"Starbucks","mode":"walking"}   turn-by-turn spoken directions; mode driving (default) or walking
+{"type":"directions","to":"Starbucks","mode":"walking"}   turn-by-turn spoken directions; mode driving (default) or walking. If the result lists options and asks "Which one?", ask the user, then send the same "to" with "choice": 1, 2 or 3
 {"type":"stop_directions"}   "stop directions", "cancel navigation"
 {"type":"run_shortcut","name":"Lights Off"}   runs one of the user's Siri Shortcuts (smart home, other apps)
 {"type":"list_add","list":"shopping","items":["milk","eggs"]}   also list_read {"list"} and list_check {"list","item"}
@@ -180,6 +182,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"person_info","name":"Mike"}   "what do I know about Mike?", "who is Mike?"
 {"type":"read_this","summarize":false}   "read me this" (reads what they copied; url optional); summarize true for "sum it up"
 {"type":"daily_recap"}   "recap my day", "how was my day"
+{"type":"learn_word","word":"Kylee"}   "learn the name Kylee, K-Y-L-E-E", or when the user corrects a name you misheard
 {"type":"undo_last"}   "undo", "remove that", "that's wrong, delete it" right after adding an event or reminder
 {"type":"scan_doc"}   "scan this document / letter / receipt" (multi-page PDF + text in Files)
 {"type":"photo_file","target":"calendar"}   "take a picture of this and add it to my calendar / notes / reminders"; target auto if not said; fromLibrary true for "use a photo I already took"

@@ -149,3 +149,21 @@ test('reader blocks private addresses and extracts article text', async () => {
   assert.match(r.text, /council voted/);
   assert.doesNotMatch(r.text, /Menu|x\(\)/);
 });
+
+test('place search drops roads and duplicates, nearest first', async () => {
+  const { cleanPlaces, findPlaces } = await import('../src/reader.mjs');
+  const raw = [
+    { name: 'Walmart Supercenter', lat: '40.0757', lon: '-80.8750', address: { house_number: '50739', road: 'Valley Plaza Drive', city: 'Saint Clairsville', state: 'Ohio' } },
+    { name: 'Walmart Supercenter', lat: '39.9268', lon: '-80.7477', address: { house_number: '10', road: 'Walmart Drive', city: 'Moundsville', state: 'West Virginia' } },
+    { name: 'Walmart', lat: '39.9265', lon: '-80.7498', address: { road: 'Walmart Drive', city: 'Moundsville' } },
+    { name: 'Walmart Drive', category: 'highway', lat: '39.9272', lon: '-80.7493' },
+  ];
+  const c = cleanPlaces(raw, 39.93, -80.75);
+  assert.equal(c.length, 2);
+  assert.equal(c[0].address, '10 Walmart Drive, Moundsville, West Virginia');
+  let calls = 0;
+  const fake = async () => { calls++; return { ok: true, json: async () => raw }; };
+  const r1 = await findPlaces('walmart', 39.93, -80.75, { fetchImpl: fake });
+  await findPlaces('Walmart', 39.93, -80.75, { fetchImpl: fake });
+  assert.equal(r1.length, 2); assert.equal(calls, 1); // second is cached
+});

@@ -11,6 +11,7 @@ import { speak } from './voice';
 import { getSettings } from './settings';
 import { setPhoneMic } from './micState';
 import { note } from './diary';
+import { vocabList } from './vocab';
 
 let active = false;
 let resolveHeard: ((t: string) => void) | null = null;
@@ -30,7 +31,7 @@ function hear(): Promise<string> {
     resolveHeard = resolve;
     try {
       ExpoSpeechRecognitionModule.start({
-        lang: 'en-US', interimResults: true, continuous: false, requiresOnDeviceRecognition: true, addsPunctuation: false,
+        lang: 'en-US', interimResults: true, continuous: false, requiresOnDeviceRecognition: true, addsPunctuation: false, contextualStrings: vocabList(100),
         iosCategory: { category: 'playAndRecord', categoryOptions: ['defaultToSpeaker', 'allowBluetoothA2DP'], mode: 'default' },
       });
     } catch { resolve(''); }

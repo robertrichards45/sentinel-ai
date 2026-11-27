@@ -7,6 +7,7 @@
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
 //   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
 //   POST /v1/live         -> {token, model, expiresAt, endpoints[]}  short-lived token for real-time voice
+//   POST /v1/places       {q, lat, lon}                         -> {places: [{name, address, lat, lon}]}  nearest first
 //   POST /v1/read         {url}                                 -> {title, text}  readable text of a public web page
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
 import { createServer } from 'node:http';
@@ -15,7 +16,7 @@ import { issueToken, verifyToken, take, usageSnapshot } from './auth.mjs';
 import * as gemini from './providers/gemini.mjs';
 import * as openai from './providers/openai.mjs';
 import * as mock from './providers/mock.mjs';
-import { readPage } from './reader.mjs';
+import { readPage, findPlaces } from './reader.mjs';
 
 const PROVIDERS = { gemini, openai };
 const providerFor = (name) => (config.mock ? mock : PROVIDERS[name]);
@@ -99,6 +100,15 @@ export const server = createServer(async (req, res) => {
       catch (e) { return send(res, e.status ?? 502, { error: e.message }); }
     }
 
+    if (req.method === 'POST' && url.pathname === '/v1/places') {
+      if (!take('p:' + installId, 200)) return send(res, 429, { error: 'Place search limit reached for today.' });
+      const b = await body(req);
+      const q = clean(b.q, 120).trim();
+      if (!q) return send(res, 400, { error: 'No place' });
+      try { return send(res, 200, { places: await findPlaces(q, Number(b.lat), Number(b.lon)) }); }
+      catch (e) { return send(res, e.status ?? 502, { error: e.message }); }
+    }
+
     if (req.method === 'POST' && url.pathname === '/v1/live') {
       if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Real-time voice needs a Gemini key on the server.' });
       if (!take('global-live', config.limits.globalPerDay)) return send(res, 429, { error: 'Alice is at today\'s capacity. Try again tomorrow.' });
@@ -135,7 +145,7 @@ export const server = createServer(async (req, res) => {
       if (!b.audioBase64) return send(res, 400, { error: 'No audio' });
       let name = config.transcribeProvider;
       if (!hasKey(name)) name = Object.keys(PROVIDERS).find(hasKey) ?? name;
-      const r = await providerFor(name).transcribe({ audioBase64: b.audioBase64, mime });
+      const r = await providerFor(name).transcribe({ audioBase64: b.audioBase64, mime, hint: clean(b.hint, 1500) || undefined });
       return send(res, 200, { text: r.text, provider: name, model: r.model, ms: Date.now() - t0 });
     }
 
