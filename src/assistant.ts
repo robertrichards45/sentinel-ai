@@ -1,6 +1,6 @@
 import { respond, transcribe, transcribeAudio, audioOf, Source, Attachment } from './ai';
 import { parseAssistantTurn, ACTION_SCHEMA_PROMPT } from './intents';
-import { runAction } from './actions';
+import { runAction, byVoice } from './actions';
 import { memory } from './memory';
 import { getSettings } from './settings';
 import { allModes } from './modeStore';
@@ -55,7 +55,7 @@ export async function ask(opts: { text?: string; audioUri?: string; audioData?: 
   const outcomes: string[] = [];
   if (turn.reply) await speak(mode.speakFull || opts.file ? turn.reply : turn.reply.slice(0, 1200), undefined, mode.id);
   for (const a of turn.actions) {
-    try { outcomes.push(await runAction(a)); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
+    try { outcomes.push(await (audio ? byVoice(() => runAction(a)) : runAction(a))); } catch (e: any) { outcomes.push(`Could not ${a.type}: ${e?.message ?? e}`); }
   }
   if (outcomes.length) await speak(outcomes.join(' '), undefined, mode.id);
   if (s.memoryEnabled) { await memory.turn('user', asked); await memory.turn('assistant', turn.reply); }

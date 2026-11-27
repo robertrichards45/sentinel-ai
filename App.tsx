@@ -23,6 +23,7 @@ import { useGlasses } from './src/hooks';
 import { onGlassesButton } from './src/glassesState';
 import { requestListen, isTalkLink, onWake, parseAliceLink } from './src/triggers';
 import { readThis } from './src/readAloud';
+import * as Calendar from 'expo-calendar';
 import { speakRecap, recapReady } from './src/recap';
 import { speak } from './src/voice';
 import './src/catchUp';
@@ -113,6 +114,14 @@ function Shell() {
     Linking.getInitialURL().then(link);
     const sub = Linking.addEventListener('url', ({ url }) => link(url));
     recapReady();
+    // Ask for Calendar and Reminders up front while you're looking at the screen; a permission pop-up that
+    // appears later, mid-conversation with the phone in your pocket, would block "add it to my calendar".
+    (async () => {
+      try {
+        if ((await Calendar.getCalendarPermissions()).status === 'undetermined') await Calendar.requestCalendarPermissions();
+        if ((await Calendar.getRemindersPermissions()).status === 'undetermined') await Calendar.requestRemindersPermissions();
+      } catch {}
+    })();
     const offBtn = onGlassesButton(talk);
     return () => { sub.remove(); offBtn(); offWake(); offSetup(); };
   }, []);

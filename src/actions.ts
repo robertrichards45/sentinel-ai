@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { scanDocument } from './docScan';
 import { photoToPlanner } from './photoFile';
 import { catchUpText } from './catchUp';
@@ -49,15 +50,33 @@ async function saveDocument(title: string, format: 'pdf' | 'text', content: stri
   return dest;
 }
 
-/** Ask the user before anything that creates data outside the app. */
+/**
+ * Ask the user before anything that creates data outside the app — but only with a pop-up when they're
+ * looking at the screen. By voice (glasses, Hey Alice, the orb) the phone is usually in a pocket, so a pop-up
+ * would wait forever and nothing would get added. Then she just does it and says "say undo to remove it".
+ */
+let voiceDepth = 0;
+export async function byVoice<T>(fn: () => Promise<T>): Promise<T> { voiceDepth++; try { return await fn(); } finally { voiceDepth--; } }
 const confirm = (title: string, msg: string) =>
   new Promise<boolean>((res) => {
-    if (!getSettings().confirmActions) return res(true);
+    if (!getSettings().confirmActions || voiceDepth > 0 || AppState.currentState !== 'active') return res(true);
     Alert.alert(title, msg, [
       { text: 'Cancel', style: 'cancel', onPress: () => res(false) },
       { text: 'OK', onPress: () => res(true) },
     ]);
   });
+
+let lastMade: { what: string; remove: () => Promise<unknown> } | null = null;
+const UNDO = ' Say "undo" if that\'s wrong.';
+
+/** Calendar to write to: the iPhone's default, or the first one that accepts new events. */
+async function writableCalendar(): Promise<any> {
+  try { const d: any = Calendar.getDefaultCalendarSync(); if (d && d.allowsModifications !== false) return d; } catch {}
+  const cals: any[] = await Calendar.getCalendars('event' as any);
+  const c = cals.find((x) => x.allowsModifications && /icloud|calendar/i.test(`${x.source?.name ?? ''} ${x.title ?? ''}`)) ?? cals.find((x) => x.allowsModifications);
+  if (!c) throw new Error('There is no calendar on this iPhone that I can add to. Open the Calendar app once, then try again.');
+  return c;
+}
 
 const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString() : 'no time set');
 
@@ -77,7 +96,8 @@ export async function runAction(a: Action): Promise<string> {
       const lists = await Calendar.getCalendars('reminder' as any);
       const list = lists.find((c: any) => c.allowsModifications) ?? lists[0];
       if (!list) return 'No reminders list found on this iPhone.';
-      await list.createReminder({ title: a.title, alarms: [{ structuredLocation: { title: a.place, proximity: a.when === 'leave' ? 'leave' : 'enter', radius: 150, coords: { latitude: where.lat, longitude: where.lon } } }] } as any);
+      const pr: any = await list.createReminder({ title: a.title, alarms: [{ structuredLocation: { title: a.place, proximity: a.when === 'leave' ? 'leave' : 'enter', radius: 150, coords: { latitude: where.lat, longitude: where.lon } } }] } as any);
+      lastMade = { what: `the reminder to ${a.title}`, remove: () => pr.delete() };
       return `Done. I'll remind you to ${a.title.charAt(0).toLowerCase() + a.title.slice(1)} when you ${a.when === 'leave' ? 'leave' : 'get to'} ${a.place}. iPhone handles it, even when I'm closed.`;
     }
     case 'what_you_know': {
@@ -99,7 +119,8 @@ export async function runAction(a: Action): Promise<string> {
       const lists = await Calendar.getCalendars('reminder' as any);
       const list = lists.find((c: any) => c.allowsModifications) ?? lists[0];
       if (!list) return 'No reminders list found on this iPhone.';
-      await list.createReminder({ title: a.title, ...(a.due ? { dueDate: new Date(a.due), alarms: [{ relativeOffset: 0 }] } : {}) } as any);
+      const rm: any = await list.createReminder({ title: a.title, ...(a.due ? { dueDate: new Date(a.due), alarms: [{ relativeOffset: 0 }] } : {}) } as any);
+      lastMade = { what: `the reminder to ${a.title}`, remove: () => rm.delete() };
       if (getSettings().memoryEnabled && a.due) memory.note(`Reminder: "${a.title}" at ${fmt(a.due)}`).catch(() => {});
       return `Reminder set${a.due ? ' for ' + fmt(a.due) + ". Your phone will alert you then" : ''}.`;
     }
@@ -108,7 +129,7 @@ export async function runAction(a: Action): Promise<string> {
       if (!(await confirm('Add calendar event?', `${a.title}\n${start.toLocaleString()} (${a.durationMin} min)`))) return 'Event cancelled.';
       const p = await Calendar.requestCalendarPermissions();
       if (p.status !== 'granted') return 'I need Calendar permission to do that.';
-      const cal = Calendar.getDefaultCalendarSync();
+      const cal = await writableCalendar();
       // With a place: estimate the drive and add a "time to leave" alert (10 minutes of slack, no live traffic).
       let leaveNote = '';
       const alarms: any[] = [{ relativeOffset: -1440 }, { relativeOffset: -60 }, { relativeOffset: -15 }];
@@ -120,9 +141,12 @@ export async function runAction(a: Action): Promise<string> {
           leaveNote = ` It's about a ${mins}-minute drive from here, so I'll tell you to leave ${mins + 10} minutes before.`;
         }
       }
-      await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms, ...(a.place ? { location: a.place } : {}) } as any);
+      if (isNaN(start.getTime())) return "I didn't catch the date and time for that.";
+      const ev: any = await cal.createEvent({ title: a.title, startDate: start, endDate: end, alarms, ...(a.place ? { location: a.place } : {}) } as any);
+      lastMade = { what: `${a.title} on your calendar`, remove: () => ev.delete() };
+      note('event-added', { cal: String(cal.title ?? '').slice(0, 30) });
       if (getSettings().memoryEnabled) memory.note(`Has "${a.title}" on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`).catch(() => {});
-      return `Added ${a.title} on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. I'll remind you the day before, an hour before and 15 minutes before.${leaveNote}`;
+      return `Added ${a.title} on ${start.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}. I'll remind you the day before, an hour before and 15 minutes before.${leaveNote}${UNDO}`;
     }
     case 'email': {
       if (!(await MailComposer.isAvailableAsync())) return 'Mail is not set up on this iPhone.';
@@ -204,6 +228,12 @@ export async function runAction(a: Action): Promise<string> {
     case 'person_info': return personInfo(a.name);
     case 'read_this': return readThis({ url: a.url, summarize: a.summarize });
     case 'daily_recap': return recapText();
+    case 'undo_last': {
+      if (!lastMade) return "There's nothing for me to undo.";
+      const m = lastMade; lastMade = null;
+      await m.remove();
+      return `Removed ${m.what}.`;
+    }
     case 'scan_doc': return scanDocument();
     case 'photo_file': return photoToPlanner(a.target, !!a.fromLibrary, (x) => { const v = validateAction(x, []); return v ? runAction(v as Action) : Promise.resolve('That did not work.'); });
     case 'stop_listening': {

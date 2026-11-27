@@ -17,7 +17,7 @@ import { Buffer } from 'buffer';
 import { liveSession } from './ai';
 import { validateAction, Action } from './intents';
 import { peopleNames } from './people';
-import { runAction } from './actions';
+import { runAction, byVoice } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
 import { memory } from './memory';
@@ -35,7 +35,7 @@ const NATURAL = ['Sulafat', 'Aoede', 'Laomedeia', 'Achernar', 'Vindemiatrix', 'D
 const TOOLS = [
   { name: 'remember', description: 'Save a lasting fact about the user: ALWAYS call it when they tell you something about themselves worth knowing later (their car, family, job, home, likes, plans, preferences) or say remember. Write it as a short standalone sentence, e.g. "Drives a 2021 Dodge Charger".', parameters: { type: 'OBJECT', properties: { fact: { type: 'STRING' } }, required: ['fact'] } },
   { name: 'reminder', description: 'Create an iPhone reminder. due is ISO 8601 with the user UTC offset.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, due: { type: 'STRING' } }, required: ['title'] } },
-  { name: 'event', description: 'Add a calendar event. place (optional): where it is; adds a time-to-leave alert.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' }, place: { type: 'STRING' } }, required: ['title', 'start'] } },
+  { name: 'event', description: 'Add an event to the iPhone Calendar right away (no need to ask first; it can be undone). start: ISO 8601 with the local UTC offset, worked out from today\'s date. place (optional): where it is; adds a time-to-leave alert. Read back the title, day and time from the result.', parameters: { type: 'OBJECT', properties: { title: { type: 'STRING' }, start: { type: 'STRING' }, durationMin: { type: 'NUMBER' }, place: { type: 'STRING' } }, required: ['title', 'start'] } },
   { name: 'email', description: 'Open an email draft for the user to send.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, subject: { type: 'STRING' }, body: { type: 'STRING' } }, required: ['subject', 'body'] } },
   { name: 'navigate', description: 'Start Apple Maps directions.', parameters: { type: 'OBJECT', properties: { destination: { type: 'STRING' }, mode: { type: 'STRING', enum: ['walking', 'driving', 'transit'] } }, required: ['destination'] } },
   { name: 'save_spot', description: 'Remember the user\'s current location, e.g. where they parked. label defaults to car.', parameters: { type: 'OBJECT', properties: { label: { type: 'STRING' } } } },
@@ -51,6 +51,7 @@ const TOOLS = [
   { name: 'person_info', description: 'What Alice knows about a person ("who is Mike?", "what do I know about Sarah?").', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
   { name: 'read_this', description: 'Read an article or text aloud: what the user copied, or url. summarize true to sum it up instead. If it says it is reading, just say okay.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, summarize: { type: 'BOOLEAN' } } } },
   { name: 'daily_recap', description: 'Recap the user\'s day (calendar, finished reminders, notes, meetings). Say the result.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'undo_last', description: 'Undo the event or reminder just added ("undo", "remove that").', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'scan_doc', description: 'Scan a paper document (one or more pages) into a PDF with its text, saved in Files. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'photo_file', description: 'Take a picture (flyer, appointment card, ticket, receipt, whiteboard...) and file it: target calendar, reminder, note or auto. fromLibrary true to pick an existing photo. Say the result.', parameters: { type: 'OBJECT', properties: { target: { type: 'STRING', enum: ['auto', 'calendar', 'reminder', 'note'] }, fromLibrary: { type: 'BOOLEAN' } } } },
   { name: 'run_shortcut', description: 'Run one of the user\'s Siri Shortcuts by name (e.g. smart-home lights, thermostat, scenes).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
@@ -277,7 +278,7 @@ class LiveSession {
     for (const c of calls) {
       const a = validateAction({ type: c.name, ...(c.args ?? {}) }, modes) as Action | null;
       let result: string;
-      try { result = a ? await runAction(a) : `Could not do ${c.name}: missing or invalid details.`; }
+      try { result = a ? await byVoice(() => runAction(a)) : `Could not do ${c.name}: missing or invalid details.`; }
       catch (e: any) { result = `Could not do ${c.name}: ${e?.message ?? e}`; }
       this.ev.line({ who: 'done', text: result, t: Date.now() });
       functionResponses.push({ id: c.id, name: c.name, response: { result } });

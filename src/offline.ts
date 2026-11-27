@@ -5,7 +5,7 @@
  */
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { parseOffline, OFFLINE_HELP } from './offlineCore';
-import { runAction } from './actions';
+import { runAction, byVoice } from './actions';
 import { validateAction, Action } from './intents';
 import { speak } from './voice';
 import { getSettings } from './settings';
@@ -55,7 +55,7 @@ export async function offlineTurn(): Promise<void> {
     if ('say' in r) { await speak(r.say); return; }
     const a = validateAction(r.action as any, []) as Action | null;
     if (!a) { await speak(OFFLINE_HELP); return; }
-    const out = await runAction(a).catch((e) => String(e?.message ?? e));
+    const out = await byVoice(() => runAction(a)).catch((e) => String(e?.message ?? e));
     await speak(out);
   } finally { active = false; setPhoneMic(false); }
 }

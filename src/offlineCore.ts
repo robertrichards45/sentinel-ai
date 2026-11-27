@@ -42,6 +42,7 @@ export function parseOffline(raw: string, shortcuts: string[] = [], now = new Da
   if (!low) return null;
   if (/\b(i need help|help me|emergency|i'?m hurt|call for help|sos)\b/.test(low)) return { action: { type: 'emergency' } };
   if (/^(yes,? )?call 911$|^call 9 1 1$/.test(low)) return { action: { type: 'call_911' } };
+  if (/^(undo|undo that|remove that|delete that)$/.test(low)) return { action: { type: 'undo_last' } };
   if (/\b(cancel|stop|clear|delete)\b.*\b(timers?|alarms?)\b/.test(low)) return { action: { type: 'cancel_timers' } };
   if (/\btimer\b/.test(low)) { const s = parseDuration(low); return s ? { action: { type: 'timer', seconds: s } } : { say: 'How long should the timer be?' }; }
   if (/\b(wake me( up)?|alarm)\b/.test(low)) { const d = parseClock(low.replace(/.*\b(at|for)\b/, ''), now); return d ? { action: { type: 'alarm', at: d.toISOString() } } : { say: 'What time should I set the alarm for?' }; }

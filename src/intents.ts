@@ -26,6 +26,7 @@ export type Action =
   | { type: 'read_this'; url?: string; summarize?: boolean }
   | { type: 'daily_recap' }
   | { type: 'scan_doc' }
+  | { type: 'undo_last' }
   | { type: 'photo_file'; target: 'auto' | 'note' | 'calendar' | 'reminder'; fromLibrary?: boolean }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
@@ -84,6 +85,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'read_this': { const url = str(a.url, 2000); return { type: 'read_this', ...(url && /^https?:\/\//i.test(url) ? { url } : {}), ...(a.summarize === true || a.summarize === 'true' ? { summarize: true } : {}) }; }
     case 'daily_recap': return { type: 'daily_recap' };
     case 'scan_doc': return { type: 'scan_doc' };
+    case 'undo_last': return { type: 'undo_last' };
     case 'photo_file': { const t = String(a.target ?? 'auto').toLowerCase(); const target = /calendar|event/.test(t) ? 'calendar' : /remind/.test(t) ? 'reminder' : /note/.test(t) ? 'note' : 'auto'; return { type: 'photo_file', target, ...(a.fromLibrary === true ? { fromLibrary: true } : {}) }; }
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
@@ -178,6 +180,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"person_info","name":"Mike"}   "what do I know about Mike?", "who is Mike?"
 {"type":"read_this","summarize":false}   "read me this" (reads what they copied; url optional); summarize true for "sum it up"
 {"type":"daily_recap"}   "recap my day", "how was my day"
+{"type":"undo_last"}   "undo", "remove that", "that's wrong, delete it" right after adding an event or reminder
 {"type":"scan_doc"}   "scan this document / letter / receipt" (multi-page PDF + text in Files)
 {"type":"photo_file","target":"calendar"}   "take a picture of this and add it to my calendar / notes / reminders"; target auto if not said; fromLibrary true for "use a photo I already took"
 {"type":"note","text":"..."}
