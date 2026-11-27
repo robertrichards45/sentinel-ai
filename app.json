@@ -2,7 +2,7 @@
   "expo": {
     "name": "Alice",
     "slug": "alice",
-    "version": "0.19.2",
+    "version": "0.19.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "46",
+      "buildNumber": "47",
       "infoPlist": {
         "CFBundleDisplayName": "Alice",
         "NSBluetoothAlwaysUsageDescription": "Alice connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
@@ -144,6 +144,12 @@
         }
       ]
     ],
-    "scheme": "alice"
+    "scheme": [
+      "alice",
+      "com.googleusercontent.apps.651257358617-beuha076g6v4nig55gk42u33npldna5t"
+    ],
+    "extra": {
+      "googleIosClientId": "651257358617-beuha076g6v4nig55gk42u33npldna5t.apps.googleusercontent.com"
+    }
   }
 }

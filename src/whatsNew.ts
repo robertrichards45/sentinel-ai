@@ -8,6 +8,9 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.19.3', date: '2026-11-27', items: [
+    'Gmail is ready: tap Connect Gmail in Settings once, then ask me to check, read, reply to, send or archive email',
+  ] },
   { version: '0.19.2', date: '2026-11-27', items: [
     'Fixed the big one: my abilities, instructions and your chosen voice were being ignored in conversations. Calls, self-check, memory, weather and everything else now work by voice',
     'Every build is now tested against my real AI with 34 everyday requests before it reaches you',
