@@ -25,6 +25,9 @@ export type Settings = {
   catchUp: boolean; // 'welcome back' summary when the glasses reconnect after 2+ hours
   eveningRecap: boolean; // daily recap notification
   recapHour: number; // 0-23
+  homeAssistantUrl: string; // e.g. https://xyz.ui.nabu.casa (token is in the Keychain)
+  webhooks: { name: string; url: string }[]; // custom connections
+  toured: boolean; // has seen the 'what Alice can do' tour
   noiseFilter: boolean; // ignore background noise on the phone mic
   cameraHidden: boolean; // live camera runs without showing the preview
   customWords: string[]; // names/words to bias speech recognition toward
@@ -63,6 +66,9 @@ export const DEFAULTS: Settings = {
   catchUp: true,
   eveningRecap: false,
   recapHour: 21,
+  homeAssistantUrl: '',
+  webhooks: [],
+  toured: false,
   noiseFilter: true,
   cameraHidden: false,
   customWords: [],

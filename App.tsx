@@ -30,6 +30,8 @@ import './src/catchUp';
 import './src/selfRepair';
 import { wakeWordReady } from './src/wakeWord';
 import { Onboarding } from './src/screens/Onboarding';
+import { Tour } from './src/screens/Tour';
+import { onTour } from './src/triggers';
 import { startGlasses, activeGlasses as glassesInfoActive } from './src/glasses/connector';
 import { maybeHeadsUp } from './src/headsUp';
 import { getSettings, onSettings } from './src/settings';
@@ -89,12 +91,15 @@ function Shell() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>('home');
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [tour, setTour] = useState(false);
+  useEffect(() => onTour(() => setTour(true)), []);
 
   useEffect(() => {
     (async () => {
       await Promise.all([loadSettings(), memory.load(), loadModes()]);
       setHealthUrl(healthUrl()); checkNet();
       setNeedsSetup(!getSettings().glassesModel);
+      if (getSettings().glassesModel && !getSettings().toured) setTour(true); // existing users see the tour once
       setReady(true);
       if (getSettings().glassesModel) {
         startGlasses(); // connects G2's data link; other glasses are plain iPhone Bluetooth audio
@@ -135,10 +140,10 @@ function Shell() {
       <StatusBar style="light" />
       <Backdrop />
       <View style={{ flex: 1, paddingTop: inset.top }}>
-        {ready && fontsLoaded && needsSetup ? <Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); }} /> : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
+        {ready && fontsLoaded && needsSetup ? <Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); if (!getSettings().toured) setTour(true); }} /> : ready && fontsLoaded && tour ? <Tour onDone={() => { setTour(false); setTab('assist' as any); }} /> : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
-      {ready && fontsLoaded && !needsSetup ? <ActivityBanner /> : null}
-      {ready && fontsLoaded && !needsSetup ? <TabBar tab={tab} setTab={setTab} /> : null}
+      {ready && fontsLoaded && !needsSetup && !tour ? <ActivityBanner /> : null}
+      {ready && fontsLoaded && !needsSetup && !tour ? <TabBar tab={tab} setTab={setTab} /> : null}
     </View>
   );
 }

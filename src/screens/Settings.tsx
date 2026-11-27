@@ -14,6 +14,8 @@ import { glassesInfo } from '../glasses/catalog';
 import { Btn, C, Card, F, Field, Glass, Pill, S, Toggle, Title } from '../ui';
 import { VOICES, VOICE_STYLES, speak } from '../voice';
 import { allModes } from '../modeStore';
+import { connSecret, homeControl } from '../connections';
+import { showTour } from '../triggers';
 
 const STATUS_COLOR: Record<Status, string> = { tested: C.mint, built: C.violet, partial: C.amber, blocked: C.red, unsupported: C.sub, proposed: C.sub };
 
@@ -152,6 +154,14 @@ export default function Settings() {
         </View>
       </Card>
 
+      <Btn icon="sparkles-outline" title="What Alice can do" onPress={showTour} />
+
+      <Connections />
+
+      <Card title="Listening">
+        <Toggle label="Ignore background noise" hint="Alice learns your room's normal noise (TV, fan, people nearby) and only listens when someone is clearly talking to her. Turn off if she misses you when you speak quietly." value={s.noiseFilter} onChange={(v) => updateSettings({ noiseFilter: v })} />
+      </Card>
+
       <Card title="Catch-ups and recaps">
         <Toggle label="Catch me up" hint="When your glasses reconnect after 2+ hours away, Alice tells you what's left today, your timers and anything coming up." value={s.catchUp} onChange={(v) => updateSettings({ catchUp: v })} />
         <Toggle label="Evening recap" hint="A notification each evening. Tap it and Alice recaps your day: calendar, finished reminders, notes and meetings." value={s.eveningRecap} onChange={(v) => updateSettings({ eveningRecap: v })} />
@@ -243,5 +253,43 @@ function NameList({ items, onChange, placeholder }: { items: string[]; onChange:
       <Field label="Add" value={v} onChange={setV} placeholder={placeholder} />
       <Btn title="Add" disabled={!v.trim() || items.includes(v.trim())} onPress={() => { onChange([...items, v.trim()].slice(0, 30)); setV(''); }} />
     </View>
+  );
+}
+
+/** Settings, Connections: Home Assistant, IFTTT and custom webhooks. Secrets go to the Keychain. */
+function Connections() {
+  const s = useSettings();
+  const [token, setToken] = useState('');
+  const [key, setKey] = useState('');
+  const [hasToken, setHasToken] = useState(false);
+  const [hasKey, setHasKey] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [hookName, setHookName] = useState('');
+  const [hookUrl, setHookUrl] = useState('');
+  useEffect(() => { connSecret.get('ha-token').then((t) => setHasToken(!!t)); connSecret.get('ifttt-key').then((k) => setHasKey(!!k)); }, []);
+  return (
+    <Card title="Connections">
+      <Text style={S.dim}>Home Assistant controls almost any smart-home device (lights, plugs, locks, thermostats, garage, TV, many cars). Paste its address (use the remote Nabu Casa address so it works away from home) and a long-lived access token (Home Assistant: your profile, Security, Long-lived access tokens).</Text>
+      <Field label="Home Assistant address" value={s.homeAssistantUrl} onChange={(v) => updateSettings({ homeAssistantUrl: v.trim() })} placeholder="https://yourname.ui.nabu.casa" />
+      <Field label={hasToken ? 'Access token (saved — paste to replace)' : 'Access token'} value={token} onChange={setToken} placeholder="eyJ…" secure />
+      <View style={[S.row, { gap: 8, flexWrap: 'wrap' }]}>
+        <Btn title="Save token" disabled={!token.trim()} onPress={async () => { await connSecret.set('ha-token', token); setToken(''); setHasToken(true); setMsg('Token saved in the Keychain.'); }} />
+        <Btn kind="ghost" title="Test" disabled={!s.homeAssistantUrl} onPress={async () => setMsg(await homeControl('what time is it'))} />
+      </View>
+      <Text style={S.dim}>IFTTT: your Webhooks key (ifttt.com/maker_webhooks, Documentation). Then "Alice, trigger start car" fires the applet named start_car.</Text>
+      <Field label={hasKey ? 'IFTTT key (saved — paste to replace)' : 'IFTTT Webhooks key'} value={key} onChange={setKey} placeholder="key" secure />
+      <Btn kind="ghost" title="Save IFTTT key" disabled={!key.trim()} onPress={async () => { await connSecret.set('ifttt-key', key); setKey(''); setHasKey(true); setMsg('IFTTT key saved in the Keychain.'); }} />
+      <Text style={S.dim}>Custom connections (Zapier, Make, any https webhook): give it a name you'll say, like "Morning routine".</Text>
+      {(s.webhooks ?? []).map((w) => (
+        <View key={w.name} style={[S.row, { justifyContent: 'space-between' }]}>
+          <Text style={[S.body, { flex: 1 }]}>{w.name}</Text>
+          <Btn kind="ghost" title="✕" onPress={() => updateSettings({ webhooks: s.webhooks.filter((x) => x.name !== w.name) })} />
+        </View>
+      ))}
+      <Field label="Name" value={hookName} onChange={setHookName} placeholder="Morning routine" />
+      <Field label="Webhook address" value={hookUrl} onChange={setHookUrl} placeholder="https://hooks.zapier.com/…" />
+      <Btn kind="ghost" title="Add connection" disabled={!hookName.trim() || !/^https:\/\//i.test(hookUrl.trim())} onPress={() => { updateSettings({ webhooks: [...(s.webhooks ?? []), { name: hookName.trim(), url: hookUrl.trim() }].slice(0, 30) }); setHookName(''); setHookUrl(''); }} />
+      {msg ? <Text style={S.dim}>{msg}</Text> : null}
+    </Card>
   );
 }

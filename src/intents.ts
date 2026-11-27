@@ -35,6 +35,10 @@ export type Action =
   | { type: 'log_set'; exercise: string; reps: number; weight?: number }
   | { type: 'workout_history'; days?: number }
   | { type: 'foresight' }
+  | { type: 'home_control'; command: string }
+  | { type: 'ifttt'; event: string; value?: string }
+  | { type: 'webhook'; name: string; value?: string }
+  | { type: 'capabilities' }
   | { type: 'shop'; item: string; store?: string; fulfillment?: 'delivery' | 'pickup'; brand?: string }
   | { type: 'recall'; query: string; last?: number; who?: 'user' | 'assistant' | 'any' }
   | { type: 'make_file'; kind: 'word' | 'pdf' | 'excel' | 'powerpoint'; request: string; title?: string }
@@ -108,6 +112,10 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'self_check': return { type: 'self_check' };
     case 'explain': return { type: 'explain' };
     case 'foresight': return { type: 'foresight' };
+    case 'capabilities': return { type: 'capabilities' };
+    case 'home_control': { const c = str(a.command, 300); return c ? { type: 'home_control', command: c } : null; }
+    case 'ifttt': { const e = str(a.event, 60); const v = str(a.value, 300); return e ? { type: 'ifttt', event: e, ...(v ? { value: v } : {}) } : null; }
+    case 'webhook': { const n = str(a.name, 60); const v = str(a.value, 300); return n ? { type: 'webhook', name: n, ...(v ? { value: v } : {}) } : null; }
     case 'coach': { const ex = str(a.exercise, 60); return { type: 'coach', on: a.on !== false && a.on !== 'false', ...(ex ? { exercise: ex } : {}) }; }
     case 'log_set': { const ex = str(a.exercise, 60); const reps = Math.round(Number(a.reps)); const w = Number(a.weight); return ex && reps > 0 && reps < 500 ? { type: 'log_set', exercise: ex, reps, ...(w > 0 && w < 3000 ? { weight: w } : {}) } : null; }
     case 'workout_history': { const d = Number(a.days); return { type: 'workout_history', ...(d > 0 && d <= 365 ? { days: Math.round(d) } : {}) }; }
@@ -240,6 +248,10 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"coach","on":true,"exercise":"bench press"}   workout coach with the camera ("coach my bench", "watch my form"); on false to stop
 {"type":"log_set","exercise":"bench press","reps":8,"weight":185}   "log 8 reps at 185"
 {"type":"workout_history","days":7}   "how did I do this week?"
+{"type":"home_control","command":"turn off the kitchen lights"}   smart home through Home Assistant (lights, locks, thermostat, garage, TV, car...)
+{"type":"ifttt","event":"start_car"}   fire an IFTTT applet by event name
+{"type":"webhook","name":"Morning routine"}   run one of the user's custom connections
+{"type":"capabilities"}   "what can you do?", "what are your features?"
 {"type":"foresight"}   "anything coming up I should know about?", "what deadlines do I have?"
 {"type":"self_check"}   "fix yourself", "run a self-check", "something's wrong with you", "repair yourself"
 {"type":"open_app","name":"Spotify"}   "open Spotify / Instagram / my calendar / Uber"

@@ -47,3 +47,8 @@ export const setLook = (on: boolean) => {
   if (lookHandler) lookHandler(on);
   else { pendingLook = on; if (on && wakeHandler) wakeHandler(); } // opens the Talk screen, which shows the camera
 };
+
+/** Open the 'What Alice can do' tour (Settings button). */
+let tourFn: (() => void) | null = null;
+export const onTour = (fn: () => void) => { tourFn = fn; return () => { if (tourFn === fn) tourFn = null; }; };
+export const showTour = () => tourFn?.();

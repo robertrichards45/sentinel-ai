@@ -1,3 +1,5 @@
+import { homeControl, iftttTrigger, runWebhook } from './connections';
+import { CAPABILITIES_SPOKEN } from './capabilities';
 import { coach, logSet, workoutHistory } from './coach';
 import { foresightText } from './foresight';
 import { shop } from './shop';
@@ -260,6 +262,10 @@ async function runActionInner(a: Action): Promise<string> {
     case 'log_set': return logSet(a.exercise, a.reps, a.weight);
     case 'workout_history': return workoutHistory(a.days ?? 7);
     case 'foresight': return foresightText();
+    case 'home_control': return homeControl(a.command);
+    case 'ifttt': return iftttTrigger(a.event, a.value);
+    case 'webhook': return runWebhook(a.name, a.value);
+    case 'capabilities': return CAPABILITIES_SPOKEN;
     case 'make_file': return makeFile(a.kind, a.request, a.title);
     case 'undo_last': {
       if (!lastMade) return "There's nothing for me to undo.";
