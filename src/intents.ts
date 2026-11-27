@@ -35,6 +35,7 @@ export type Action =
   | { type: 'log_set'; exercise: string; reps: number; weight?: number }
   | { type: 'workout_history'; days?: number }
   | { type: 'foresight' }
+  | { type: 'health_summary' }
   | { type: 'home_control'; command: string }
   | { type: 'ifttt'; event: string; value?: string }
   | { type: 'webhook'; name: string; value?: string }
@@ -113,6 +114,7 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'self_check': return { type: 'self_check' };
     case 'explain': return { type: 'explain' };
     case 'foresight': return { type: 'foresight' };
+    case 'health_summary': return { type: 'health_summary' };
     case 'capabilities': return { type: 'capabilities' };
     case 'whats_new': return { type: 'whats_new' };
     case 'home_control': { const c = str(a.command, 300); return c ? { type: 'home_control', command: c } : null; }
@@ -255,6 +257,7 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"webhook","name":"Morning routine"}   run one of the user's custom connections
 {"type":"whats_new"}   "what's new?", "what did they update?", "what can you do now?"
 {"type":"capabilities"}   "what can you do?", "what are your features?"
+{"type":"health_summary"}   "how did I sleep?", "how many steps today?", "should I train hard today?"
 {"type":"foresight"}   "anything coming up I should know about?", "what deadlines do I have?"
 {"type":"self_check"}   "fix yourself", "run a self-check", "something's wrong with you", "repair yourself"
 {"type":"open_app","name":"Spotify"}   "open Spotify / Instagram / my calendar / Uber"

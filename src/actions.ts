@@ -1,3 +1,4 @@
+import { healthSummary } from './health';
 import { whatsNewText, markNewsTold } from './whatsNew';
 import { homeControl, iftttTrigger, runWebhook } from './connections';
 import { CAPABILITIES_SPOKEN } from './capabilities';
@@ -263,6 +264,7 @@ async function runActionInner(a: Action): Promise<string> {
     case 'log_set': return logSet(a.exercise, a.reps, a.weight);
     case 'workout_history': return workoutHistory(a.days ?? 7);
     case 'foresight': return foresightText();
+    case 'health_summary': return healthSummary();
     case 'home_control': return homeControl(a.command);
     case 'ifttt': return iftttTrigger(a.event, a.value);
     case 'webhook': return runWebhook(a.name, a.value);
