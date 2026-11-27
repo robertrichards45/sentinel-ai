@@ -1,4 +1,5 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
+import { parsePhotoFiling } from '../src/photoCore';
 import { addPersonNote, findPerson, describePerson } from '../src/peopleCore';
 import { chunksForReading } from '../src/speechCore';
 import { parseAliceLink } from '../src/triggers';
@@ -304,6 +305,18 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('link recap', parseAliceLink('alice://recap')?.kind === 'recap');
   check('person_note action', (validateAction({ type: 'person_note', name: 'Mike', note: 'from work' }, modes) as any)?.name === 'Mike');
   check('read_this ignores non-web url', (validateAction({ type: 'read_this', url: 'file:///x' }, modes) as any)?.url === undefined);
+}
+
+// --- 0.13.1: photo to calendar / notes ---
+{
+  const ev = parsePhotoFiling('```json\n{"kind":"event","title":"Dentist - Dr. Patel","start":"2026-12-03T14:30:00-05:00","durationMin":45,"place":"12 Main St","details":"Bring insurance card"}\n```', 'auto') as any;
+  check('photo event parsed', ev?.kind === 'event' && ev.place === '12 Main St' && ev.durationMin === 45);
+  check('photo bad date becomes note', parsePhotoFiling('{"kind":"event","title":"Fair","start":"sometime","details":"Dec fair"}', 'auto')?.kind === 'note');
+  check('photo forced note', parsePhotoFiling('{"kind":"event","title":"X","start":"2026-12-03T14:30:00-05:00","text":"x"}', 'note')?.kind === 'note');
+  check('photo reminder', (parsePhotoFiling('{"kind":"reminder","title":"Pay water bill","due":"2026-12-10T09:00:00-05:00"}', 'auto') as any)?.due === '2026-12-10T09:00:00-05:00');
+  check('photo junk', parsePhotoFiling('I cannot see anything', 'auto') === null);
+  check('scan_doc action', (validateAction({ type: 'scan_doc' }, modes) as any)?.type === 'scan_doc');
+  check('photo_file target', (validateAction({ type: 'photo_file', target: 'my calendar' }, modes) as any)?.target === 'calendar');
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

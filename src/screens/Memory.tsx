@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Share, Text, View } from 'react-native';
+import { Alert, Image, ScrollView, Share, Text, View } from 'react-native';
+import { photoToPlanner } from '../photoFile';
+import { scanDocument } from '../docScan';
+import { runAction } from '../actions';
+import { validateAction, Action } from '../intents';
+import { speak } from '../voice';
 import { listPeople, onPeople, forgetPerson } from '../people';
 import type { Person } from '../peopleCore';
 import { listMeetings, onMeetings, deleteMeeting, resummarize, Meeting, takingNotes, startNotes } from '../meetingNotes';
@@ -15,6 +20,16 @@ export default function Memory() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState('');
+  const filePhoto = async (lib: boolean) => {
+    setPhotoBusy(true); setPhotoMsg('Reading the picture…');
+    try {
+      const out = await photoToPlanner('auto', lib, (x) => { const v = validateAction(x, []); return v ? runAction(v as Action) : Promise.resolve('That did not work.'); });
+      setPhotoMsg(out); speak(out).catch(() => {});
+    } catch (e: any) { setPhotoMsg(String(e?.message ?? e)); }
+    finally { setPhotoBusy(false); }
+  };
   useEffect(() => { const load = () => listPeople().then((l) => setPeople(l.slice().sort((a, b) => a.name.localeCompare(b.name)))); load(); return onPeople(load); }, []);
   useEffect(() => { const load = () => listMeetings().then((l) => setMeetings(l.slice().reverse())); load(); return onMeetings(load); }, []);
 
@@ -64,11 +79,21 @@ export default function Memory() {
         {!takingNotes() ? <Btn title="Start taking notes" onPress={() => startNotes().catch((e) => Alert.alert('Could not start', String(e?.message ?? e)))} /> : null}
       </Card>
 
-      <Card title={`Notes (${m.notes.length})`}>
+      <Card title={`Notes & photos (${m.notes.length})`}>
+        <View style={[S.row, { gap: 8, flexWrap: 'wrap' }]}>
+          <Btn title="📷 Photo to calendar or notes" disabled={photoBusy} onPress={() => filePhoto(false)} />
+          <Btn kind="ghost" title="From my photos" disabled={photoBusy} onPress={() => filePhoto(true)} />
+          <Btn kind="ghost" title="📄 Scan a document" disabled={photoBusy} onPress={async () => { setPhotoBusy(true); setPhotoMsg('Scanning…'); try { const o = await scanDocument(); setPhotoMsg(o); speak(o).catch(() => {}); } catch (e: any) { setPhotoMsg(String(e?.message ?? e)); } finally { setPhotoBusy(false); } }} />
+        </View>
+        {photoMsg ? <Text style={S.dim}>{photoMsg}</Text> : null}
         {m.notes.slice().reverse().slice(0, 30).map((n) => (
-          <Text key={n.id} style={S.body}>• {n.text} <Text style={S.dim}>({new Date(n.created).toLocaleDateString()})</Text></Text>
+          <View key={n.id} style={[S.row, { alignItems: 'flex-start', gap: 8 }]}>
+            {n.image ? <Image source={{ uri: n.image }} style={{ width: 56, height: 56, borderRadius: 8 }} accessibilityLabel="Photo for this note" /> : null}
+            <Text style={[S.body, { flex: 1 }]}>{n.text} <Text style={S.dim}>({new Date(n.created).toLocaleDateString()})</Text></Text>
+            <Btn kind="ghost" title="✕" onPress={() => memory.deleteNote(n.id)} />
+          </View>
         ))}
-        {!m.notes.length ? <Text style={S.dim}>Say "take a note…" to add one.</Text> : null}
+        {!m.notes.length ? <Text style={S.dim}>Say "take a note…", or take a photo of a flyer or appointment card and Alice files it.</Text> : null}
       </Card>
 
       <Card title="Conversation context">

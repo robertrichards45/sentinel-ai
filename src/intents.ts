@@ -25,6 +25,8 @@ export type Action =
   | { type: 'person_info'; name: string }
   | { type: 'read_this'; url?: string; summarize?: boolean }
   | { type: 'daily_recap' }
+  | { type: 'scan_doc' }
+  | { type: 'photo_file'; target: 'auto' | 'note' | 'calendar' | 'reminder'; fromLibrary?: boolean }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
@@ -81,6 +83,8 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'person_info': { const name = str(a.name, 60); return name ? { type: 'person_info', name } : null; }
     case 'read_this': { const url = str(a.url, 2000); return { type: 'read_this', ...(url && /^https?:\/\//i.test(url) ? { url } : {}), ...(a.summarize === true || a.summarize === 'true' ? { summarize: true } : {}) }; }
     case 'daily_recap': return { type: 'daily_recap' };
+    case 'scan_doc': return { type: 'scan_doc' };
+    case 'photo_file': { const t = String(a.target ?? 'auto').toLowerCase(); const target = /calendar|event/.test(t) ? 'calendar' : /remind/.test(t) ? 'reminder' : /note/.test(t) ? 'note' : 'auto'; return { type: 'photo_file', target, ...(a.fromLibrary === true ? { fromLibrary: true } : {}) }; }
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
     case 'reminder': {
@@ -174,6 +178,8 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"person_info","name":"Mike"}   "what do I know about Mike?", "who is Mike?"
 {"type":"read_this","summarize":false}   "read me this" (reads what they copied; url optional); summarize true for "sum it up"
 {"type":"daily_recap"}   "recap my day", "how was my day"
+{"type":"scan_doc"}   "scan this document / letter / receipt" (multi-page PDF + text in Files)
+{"type":"photo_file","target":"calendar"}   "take a picture of this and add it to my calendar / notes / reminders"; target auto if not said; fromLibrary true for "use a photo I already took"
 {"type":"note","text":"..."}
 {"type":"reminder","title":"...","due":"2026-11-26T09:00:00-05:00"}
 {"type":"event","place":"optional address or place name; adds a time-to-leave alert","title":"...","start":"...","durationMin":60}

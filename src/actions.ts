@@ -1,3 +1,5 @@
+import { scanDocument } from './docScan';
+import { photoToPlanner } from './photoFile';
 import { catchUpText } from './catchUp';
 import { personNote, personInfo } from './people';
 import { readThis } from './readAloud';
@@ -20,7 +22,7 @@ import { Alert, Linking } from 'react-native';
 import * as Calendar from 'expo-calendar';
 import * as Location from 'expo-location';
 import * as MailComposer from 'expo-mail-composer';
-import { Action } from './intents';
+import { Action, validateAction } from './intents';
 import { memory } from './memory';
 import { getSettings, updateSettings } from './settings';
 import { glassesStatusText } from './glassesState';
@@ -202,6 +204,8 @@ export async function runAction(a: Action): Promise<string> {
     case 'person_info': return personInfo(a.name);
     case 'read_this': return readThis({ url: a.url, summarize: a.summarize });
     case 'daily_recap': return recapText();
+    case 'scan_doc': return scanDocument();
+    case 'photo_file': return photoToPlanner(a.target, !!a.fromLibrary, (x) => { const v = validateAction(x, []); return v ? runAction(v as Action) : Promise.resolve('That did not work.'); });
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye
       return 'Okay, I\'ll stop listening.';

@@ -1,7 +1,7 @@
 /** Pure memory logic (unit-tested on the PC). Persistence lives in memory.ts. */
 export type Fact = { id: string; text: string; created: number };
 export type Turn = { role: 'user' | 'assistant'; text: string; t: number };
-export type Note = { id: string; text: string; created: number };
+export type Note = { id: string; text: string; created: number; image?: string };
 export type MemoryState = { facts: Fact[]; history: Turn[]; notes: Note[] };
 
 export const EMPTY: MemoryState = { facts: [], history: [], notes: [] };
@@ -38,8 +38,8 @@ export function forget(m: MemoryState, match: string): { state: MemoryState; rem
   return { state: { ...m, facts, notes }, removed: m.facts.length - facts.length + m.notes.length - notes.length };
 }
 
-export function addNote(m: MemoryState, text: string, now = Date.now()): MemoryState {
-  return { ...m, notes: [...m.notes, { id: id(now), text, created: now }].slice(-500) };
+export function addNote(m: MemoryState, text: string, now = Date.now(), image?: string): MemoryState {
+  return { ...m, notes: [...m.notes, { id: id(now), text, created: now, ...(image ? { image } : {}) }].slice(-500) };
 }
 
 export function addTurn(m: MemoryState, role: Turn['role'], text: string, now = Date.now()): MemoryState {
