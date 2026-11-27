@@ -1,4 +1,7 @@
 import { GLASSES, glassesInfo } from '../src/glasses/catalog';
+import { addPersonNote, findPerson, describePerson } from '../src/peopleCore';
+import { chunksForReading } from '../src/speechCore';
+import { parseAliceLink } from '../src/triggers';
 import { parseOffline, parseDuration, parseClock } from '../src/offlineCore';
 import { pickShortcut, listMatches } from '../src/matchCore';
 import { stepsFromOsrm, newNav, navUpdate, sayDistance, stepText, overview, metersBetween } from '../src/navCore';
@@ -280,6 +283,27 @@ check('mode pack: 1 added, 2 rejected', imp.added.length === 1 && imp.added[0].i
   check('offline help', o('I need help')?.action?.type === 'emergency');
   check('offline shortcut by name', o('lights off')?.action?.name === 'Lights Off');
   check('offline unknown', o('who won the game last night') === null);
+}
+
+// --- 0.13.0: people, reading, catch-up, recap ---
+{
+  let ppl = addPersonNote([], 'mike', 'works with me').people;
+  ppl = addPersonNote(ppl, 'Mike Torres', 'into fishing').people;
+  check('person merged with fuller name', ppl.length === 1 && ppl[0].name === 'Mike Torres' && ppl[0].notes.length === 2, ppl);
+  check('find by first name', findPerson(ppl, 'Mike')?.name === 'Mike Torres');
+  check('no duplicate notes', addPersonNote(ppl, 'Mike', 'Into fishing').people[0].notes.length === 2);
+  check('describe person', describePerson(findPerson(ppl, 'mike'), 'mike').startsWith('Mike Torres: works with me; into fishing'));
+  check('unknown person', describePerson(findPerson(ppl, 'Sarah'), 'Sarah').startsWith("I don't know anyone called Sarah"));
+  const two = addPersonNote(addPersonNote([], 'Sarah Lee', 'neighbor').people, 'Sarah Kim', 'dentist').people;
+  check('ambiguous first name not guessed', findPerson(two, 'Sarah') === null && two.length === 2);
+  const long = Array.from({ length: 40 }, (_, i) => `Sentence number ${i} is here.`).join(' ');
+  const ch = chunksForReading(long);
+  check('reading chunks', ch.length > 1 && ch.every((c) => c.length <= 520) && ch.join(' ') === long, ch.map((c) => c.length));
+  check('link read url', (parseAliceLink('alice://read?url=https%3A%2F%2Fnews.example.com%2Fa%3Fb%3D1') as any)?.url === 'https://news.example.com/a?b=1');
+  check('link shared text', (parseAliceLink('alice://read?url=Hello%20there%20friend') as any)?.text === 'Hello there friend');
+  check('link recap', parseAliceLink('alice://recap')?.kind === 'recap');
+  check('person_note action', (validateAction({ type: 'person_note', name: 'Mike', note: 'from work' }, modes) as any)?.name === 'Mike');
+  check('read_this ignores non-web url', (validateAction({ type: 'read_this', url: 'file:///x' }, modes) as any)?.url === undefined);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

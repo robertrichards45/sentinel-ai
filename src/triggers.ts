@@ -17,6 +17,17 @@ export function onListenRequest(fn: Fn) {
   return () => { if (listener === fn) listener = null; };
 }
 export const isTalkLink = (url?: string | null) => !!url && /^alice:\/\/(talk|listen)/i.test(url);
+/** alice://read?url=… / alice://read?text=… (a share-sheet Shortcut) and alice://recap. */
+export function parseAliceLink(url?: string | null): { kind: 'read'; url?: string; text?: string } | { kind: 'recap' } | null {
+  if (!url) return null;
+  const m = url.match(/^alice:\/\/(read|recap)\b\??(.*)$/i);
+  if (!m) return null;
+  if (m[1].toLowerCase() === 'recap') return { kind: 'recap' };
+  const q = new URLSearchParams(m[2]);
+  let u = q.get('url') ?? undefined, t = q.get('text') ?? undefined;
+  if (u && !/^https?:\/\//i.test(u)) { t = t ?? u; u = undefined; } // shared text arrives in url=
+  return { kind: 'read', ...(u ? { url: u } : {}), ...(t ? { text: t } : {}) };
+}
 
 /** "Hey Alice" heard: the app opens the Talk screen and starts listening. */
 let wakeHandler: Fn | null = null;

@@ -16,6 +16,7 @@ import type { AudioBufferQueueSourceNode } from 'react-native-audio-api';
 import { Buffer } from 'buffer';
 import { liveSession } from './ai';
 import { validateAction, Action } from './intents';
+import { peopleNames } from './people';
 import { runAction } from './actions';
 import { allModes } from './modeStore';
 import { getSettings } from './settings';
@@ -45,6 +46,11 @@ const TOOLS = [
   { name: 'take_notes', description: 'Meeting notes. action start: Alice goes quiet, records and transcribes the meeting; stop: writes summary, decisions and action items. Say the result back.', parameters: { type: 'OBJECT', properties: { action: { type: 'STRING', enum: ['start', 'stop'] }, title: { type: 'STRING' } }, required: ['action'] } },
   { name: 'directions', description: 'Spoken turn-by-turn directions through the glasses. to: address or place; mode: driving or walking. Read back the overview it returns.', parameters: { type: 'OBJECT', properties: { to: { type: 'STRING' }, mode: { type: 'STRING', enum: ['driving', 'walking'] } }, required: ['to'] } },
   { name: 'stop_directions', description: 'Stop turn-by-turn directions.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'catch_up', description: 'What did I miss: rest of today, next events, timers, weather. Say the result.', parameters: { type: 'OBJECT', properties: {} } },
+  { name: 'person_note', description: 'Remember something about a person the user introduces or describes ("this is Mike from work", "Sarah\'s birthday is May 3").', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' }, note: { type: 'STRING' } }, required: ['name', 'note'] } },
+  { name: 'person_info', description: 'What Alice knows about a person ("who is Mike?", "what do I know about Sarah?").', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
+  { name: 'read_this', description: 'Read an article or text aloud: what the user copied, or url. summarize true to sum it up instead. If it says it is reading, just say okay.', parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, summarize: { type: 'BOOLEAN' } } } },
+  { name: 'daily_recap', description: 'Recap the user\'s day (calendar, finished reminders, notes, meetings). Say the result.', parameters: { type: 'OBJECT', properties: {} } },
   { name: 'run_shortcut', description: 'Run one of the user\'s Siri Shortcuts by name (e.g. smart-home lights, thermostat, scenes).', parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } }, required: ['name'] } },
   { name: 'list_add', description: 'Add items to a list in iPhone Reminders (shopping, to-do, any name; created if missing).', parameters: { type: 'OBJECT', properties: { list: { type: 'STRING' }, items: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['list', 'items'] } },
   { name: 'list_read', description: 'Read what is on a list.', parameters: { type: 'OBJECT', properties: { list: { type: 'STRING' } }, required: ['list'] } },
@@ -163,6 +169,7 @@ class LiveSession {
       'When the user mentions a meeting, appointment or plan with a date ("I have a meeting Tuesday"), add it with the event tool; if no time was given, ask what time first. Use the reminder tool for to-dos with a time. Use the agenda tool when asked what is coming up.',
       `Today is ${new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}. For news, sports, scores, prices, people in the news, releases or anything that may have happened or changed recently, ALWAYS search first (Google Search, or the look_up tool) and answer from what you find. You DO have live internet access; never say you cannot access current information.`,
       (s.shortcuts ?? []).length ? `The user's Siri Shortcuts you can run with run_shortcut (lights, thermostat, scenes and more): ${s.shortcuts.join(', ')}. Match what they ask to the closest one.` : 'The run_shortcut tool runs any Siri Shortcut by name (smart home and other apps).',
+      peopleNames().length ? `People the user has told you about (use person_info for details): ${peopleNames().slice(-40).join(', ')}.` : '',
       'If the user says they need help, are hurt, in danger or it is an emergency, call the emergency tool at once, then ask if they want 911. Only call call_911 after they say yes.',
       s.memoryEnabled ? memory.prompt() : `Current local time: ${new Date().toString()}`,
     ].filter(Boolean).join('\n\n');

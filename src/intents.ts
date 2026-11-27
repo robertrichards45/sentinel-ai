@@ -20,6 +20,11 @@ export type Action =
   | { type: 'list_check'; list: string; item: string }
   | { type: 'emergency' }
   | { type: 'call_911' }
+  | { type: 'catch_up' }
+  | { type: 'person_note'; name: string; note: string }
+  | { type: 'person_info'; name: string }
+  | { type: 'read_this'; url?: string; summarize?: boolean }
+  | { type: 'daily_recap' }
   | { type: 'email'; to?: string; subject: string; body: string }
   | { type: 'navigate'; destination: string; mode: 'walking' | 'driving' | 'transit' }
   | { type: 'where_am_i' }
@@ -71,6 +76,11 @@ export function validateAction(a: any, knownModes: string[]): Action | null {
     case 'list_check': { const item = str(a.item, 120); return item ? { type: 'list_check', list: str(a.list, 60) || 'shopping', item } : null; }
     case 'emergency': return { type: 'emergency' };
     case 'call_911': return { type: 'call_911' };
+    case 'catch_up': return { type: 'catch_up' };
+    case 'person_note': { const name = str(a.name, 60), n = str(a.note, 300); return name && n ? { type: 'person_note', name, note: n } : null; }
+    case 'person_info': { const name = str(a.name, 60); return name ? { type: 'person_info', name } : null; }
+    case 'read_this': { const url = str(a.url, 2000); return { type: 'read_this', ...(url && /^https?:\/\//i.test(url) ? { url } : {}), ...(a.summarize === true || a.summarize === 'true' ? { summarize: true } : {}) }; }
+    case 'daily_recap': return { type: 'daily_recap' };
     case 'forget': { const match = str(a.match, 100); return match ? { type: 'forget', match } : null; }
     case 'note': { const text = str(a.text, 2000); return text ? { type: 'note', text } : null; }
     case 'reminder': {
@@ -159,6 +169,11 @@ export const ACTION_SCHEMA_PROMPT = `Always answer with ONE JSON object and noth
 {"type":"list_add","list":"shopping","items":["milk","eggs"]}   also list_read {"list"} and list_check {"list","item"}
 {"type":"emergency"}   the user needs help or is in danger; then ask about 911
 {"type":"call_911"}   ONLY after the user says yes to calling 911
+{"type":"catch_up"}   "what did I miss?", "catch me up"
+{"type":"person_note","name":"Mike","note":"works with me, into fishing"}   when the user introduces or describes someone
+{"type":"person_info","name":"Mike"}   "what do I know about Mike?", "who is Mike?"
+{"type":"read_this","summarize":false}   "read me this" (reads what they copied; url optional); summarize true for "sum it up"
+{"type":"daily_recap"}   "recap my day", "how was my day"
 {"type":"note","text":"..."}
 {"type":"reminder","title":"...","due":"2026-11-26T09:00:00-05:00"}
 {"type":"event","place":"optional address or place name; adds a time-to-leave alert","title":"...","start":"...","durationMin":60}

@@ -7,6 +7,7 @@
 //                         -> {text, provider, model, ms, usage, costUsd, sources}
 //   POST /v1/speak        {text, voice?, style?}                -> {audioBase64, mime, voice, model, ms}
 //   POST /v1/live         -> {token, model, expiresAt, endpoints[]}  short-lived token for real-time voice
+//   POST /v1/read         {url}                                 -> {title, text}  readable text of a public web page
 //   GET  /v1/status       (token) -> today's usage + routing (no secrets)
 import { createServer } from 'node:http';
 import { config, costUsd } from './config.mjs';
@@ -14,6 +15,7 @@ import { issueToken, verifyToken, take, usageSnapshot } from './auth.mjs';
 import * as gemini from './providers/gemini.mjs';
 import * as openai from './providers/openai.mjs';
 import * as mock from './providers/mock.mjs';
+import { readPage } from './reader.mjs';
 
 const PROVIDERS = { gemini, openai };
 const providerFor = (name) => (config.mock ? mock : PROVIDERS[name]);
@@ -88,6 +90,13 @@ export const server = createServer(async (req, res) => {
         console.log(`DIAG ${who} ${line}`);
       }
       return send(res, 200, { ok: true, n: events.length });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/v1/read') {
+      if (!take('r:' + installId, 100)) return send(res, 429, { error: 'Reading limit reached for today.' });
+      const b = await body(req);
+      try { return send(res, 200, await readPage(clean(b.url, 2000))); }
+      catch (e) { return send(res, e.status ?? 502, { error: e.message }); }
     }
 
     if (req.method === 'POST' && url.pathname === '/v1/live') {

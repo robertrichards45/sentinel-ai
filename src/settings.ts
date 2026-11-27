@@ -22,6 +22,9 @@ export type Settings = {
   modeVoices: Record<string, string>; // optional per-mode voice overrides, e.g. { research: 'Charon' }
   glassesModel: '' | 'g2' | 'headphones' | 'meta' | 'none'; // '' = not chosen yet (first-launch setup)
   dailyHeadsUp: boolean; // first time the glasses connect each day, Alice tells you what's on today
+  catchUp: boolean; // 'welcome back' summary when the glasses reconnect after 2+ hours
+  eveningRecap: boolean; // daily recap notification
+  recapHour: number; // 0-23
   shortcuts: string[]; // Siri Shortcut names Alice may run
   emergencyContacts: string[]; // names from Contacts, or phone numbers
   heyAlice: boolean; // listen for "Hey Alice" (on-device, phone mic, while Alice is open or in the background)
@@ -54,6 +57,9 @@ export const DEFAULTS: Settings = {
   liveConversation: true,
   glassesModel: '',
   dailyHeadsUp: true,
+  catchUp: true,
+  eveningRecap: false,
+  recapHour: 21,
   shortcuts: [],
   emergencyContacts: [],
   heyAlice: false,

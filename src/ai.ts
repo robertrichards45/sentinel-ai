@@ -66,6 +66,11 @@ export async function audioOf(fileUri: string): Promise<{ mime: string; base64: 
 }
 
 /** Speech-to-text for audio already in memory (e.g. the glasses' microphone as Ogg Opus). */
+/** Readable text of a public web page, fetched by Alice's server. */
+export async function readUrl(url: string): Promise<{ title: string; text: string }> {
+  return call('/v1/read', { url }, 25000);
+}
+
 export async function transcribeAudio(audio: { mime: string; base64: string }): Promise<string> {
   const j = await call('/v1/transcribe', { audioBase64: audio.base64, mime: audio.mime }, 45000);
   return String(j.text ?? '').trim();

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Share, Text, View } from 'react-native';
+import { listPeople, onPeople, forgetPerson } from '../people';
+import type { Person } from '../peopleCore';
 import { listMeetings, onMeetings, deleteMeeting, resummarize, Meeting, takingNotes, startNotes } from '../meetingNotes';
 import { memory } from '../memory';
 import { useMemory, useSettings } from '../hooks';
@@ -12,6 +14,8 @@ export default function Memory() {
   const [fact, setFact] = useState('');
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  const [people, setPeople] = useState<Person[]>([]);
+  useEffect(() => { const load = () => listPeople().then((l) => setPeople(l.slice().sort((a, b) => a.name.localeCompare(b.name)))); load(); return onPeople(load); }, []);
   useEffect(() => { const load = () => listMeetings().then((l) => setMeetings(l.slice().reverse())); load(); return onMeetings(load); }, []);
 
   return (
@@ -30,6 +34,15 @@ export default function Memory() {
         )) : <Text style={S.dim}>Nothing yet. Try: "Remember that my truck is a 2019 F-150."</Text>}
         <Field label="Add a fact" value={fact} onChange={setFact} placeholder="e.g. I'm allergic to penicillin" />
         <Btn title="Add" disabled={!fact.trim()} onPress={() => { memory.remember(fact.trim()); setFact(''); }} />
+      </Card>
+
+      <Card title={`People (${people.length})`}>
+        {people.length ? people.map((p) => (
+          <View key={p.id} style={[S.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+            <Text style={[S.body, { flex: 1 }]}><Text style={{ fontWeight: '600' }}>{p.name}</Text>{p.notes.length ? ` · ${p.notes.join('; ')}` : ''}</Text>
+            <Btn kind="ghost" title="✕" onPress={() => Alert.alert(`Forget ${p.name}?`, '', [{ text: 'Cancel', style: 'cancel' }, { text: 'Forget', style: 'destructive', onPress: () => forgetPerson(p.id) }])} />
+          </View>
+        )) : <Text style={S.dim}>Say "This is Mike from work, he's into fishing." Later ask "What do I know about Mike?"</Text>}
       </Card>
 
       <Card title={`Meeting notes (${meetings.length})`}>

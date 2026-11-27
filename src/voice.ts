@@ -92,6 +92,8 @@ export const VOICES: { id: string; label: string; feel: string }[] = [
 
 let player: AudioPlayer | null = null;
 let generation = 0; // a newer speak()/stop cancels older ones
+/** Changes whenever speech starts or is stopped: lets long readers notice they were cut off. */
+export const speechGeneration = () => generation;
 
 /** How Alice delivers her lines. Sent to the voice model as a short style direction. */
 export const VOICE_STYLES: { id: string; label: string; style: string }[] = [

@@ -14,3 +14,14 @@ export function splitForSpeech(text: string, min = 40, max = 220): [string, stri
   }
   return [t.slice(0, cut).trim(), t.slice(cut).trim()];
 }
+
+/** Split into speakable pieces of about 500 characters, on sentence ends. */
+export function chunksForReading(text: string, size = 500): string[] {
+  const sentences = text.replace(/\s*\n+\s*/g, '\n').split(/(?<=[.!?])\s+|\n/).map((s) => s.trim()).filter(Boolean);
+  const out: string[] = []; let cur = '';
+  for (const s of sentences) {
+    if ((cur + ' ' + s).length > size && cur) { out.push(cur); cur = s; } else cur = cur ? cur + ' ' + s : s;
+  }
+  if (cur) out.push(cur);
+  return out;
+}

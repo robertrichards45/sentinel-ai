@@ -136,3 +136,16 @@ test('live returns a short-lived token and endpoints, never the API key', async 
   assert.ok(!JSON.stringify(j).includes('test-secret'));
   assert.equal((await post('/v1/live', {})).status, 401);
 });
+
+test('reader blocks private addresses and extracts article text', async () => {
+  const { privateAddress, htmlToText, readPage } = await import('../src/reader.mjs');
+  for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.0.5', '172.20.0.1', '169.254.169.254', '::1', 'fd00::1', '::ffff:10.0.0.1']) assert.equal(privateAddress(ip), true, ip);
+  assert.equal(privateAddress('8.8.8.8'), false);
+  await assert.rejects(readPage('http://169.254.169.254/latest'), /not allowed/);
+  await assert.rejects(readPage('http://internal.test/', { resolve: async () => [{ address: '10.0.0.9' }] }), /not allowed/);
+  await assert.rejects(readPage('file:///etc/passwd'), /Only web pages/);
+  const r = htmlToText('<html><head><title>Big &amp; News</title><script>x()</script></head><body><nav>Menu stuff here that is long enough</nav><article><h1>Headline</h1><p>The council voted on Tuesday to fund the new bridge project.</p><p>Work starts in May.</p></article></body></html>');
+  assert.equal(r.title, 'Big & News');
+  assert.match(r.text, /council voted/);
+  assert.doesNotMatch(r.text, /Menu|x\(\)/);
+});

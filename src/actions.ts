@@ -1,3 +1,7 @@
+import { catchUpText } from './catchUp';
+import { personNote, personInfo } from './people';
+import { readThis } from './readAloud';
+import { recapText } from './recap';
 import { runShortcut } from './shortcutsRun';
 import { addToList, readList, checkOff } from './lists';
 import { emergencyText, call911 } from './emergency';
@@ -193,6 +197,11 @@ export async function runAction(a: Action): Promise<string> {
     case 'list_check': return checkOff(a.list, a.item);
     case 'emergency': return emergencyText();
     case 'call_911': return call911();
+    case 'catch_up': return catchUpText(() => runAction({ type: 'weather' } as Action));
+    case 'person_note': return personNote(a.name, a.note);
+    case 'person_info': return personInfo(a.name);
+    case 'read_this': return readThis({ url: a.url, summarize: a.summarize });
+    case 'daily_recap': return recapText();
     case 'stop_listening': {
       setTimeout(goToSleep, 1500); // after she says goodbye
       return 'Okay, I\'ll stop listening.';

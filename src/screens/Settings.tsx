@@ -152,6 +152,22 @@ export default function Settings() {
         </View>
       </Card>
 
+      <Card title="Catch-ups and recaps">
+        <Toggle label="Catch me up" hint="When your glasses reconnect after 2+ hours away, Alice tells you what's left today, your timers and anything coming up." value={s.catchUp} onChange={(v) => updateSettings({ catchUp: v })} />
+        <Toggle label="Evening recap" hint="A notification each evening. Tap it and Alice recaps your day: calendar, finished reminders, notes and meetings." value={s.eveningRecap} onChange={(v) => updateSettings({ eveningRecap: v })} />
+        {s.eveningRecap ? (
+          <View style={S.row}>
+            <Text style={[S.body, { flex: 1 }]}>Recap at {((s.recapHour + 11) % 12) + 1} {s.recapHour < 12 ? 'AM' : 'PM'}</Text>
+            <Btn kind="ghost" title="−" onPress={() => updateSettings({ recapHour: (s.recapHour + 23) % 24 })} />
+            <Btn kind="ghost" title="+" onPress={() => updateSettings({ recapHour: (s.recapHour + 1) % 24 })} />
+          </View>
+        ) : null}
+      </Card>
+
+      <Card title="Read with Alice">
+        <Text style={S.dim}>Copy a link or some text, then say "Alice, read me this" (or "sum this up"). To read straight from the Share button: in the Shortcuts app, make a shortcut that shows in the Share Sheet, receives URLs and text, runs URL Encode on the Shortcut Input, then opens alice://read?url=[URL Encoded Text]. Name it Read with Alice. Ask me and I'll walk you through it.</Text>
+      </Card>
+
       <Card title="Siri Shortcuts">
         <Text style={S.dim}>Type the exact names of Shortcuts you want Alice to run (smart-home lights, thermostat, scenes, anything in the Shortcuts app). Then say "Alice, lights off".</Text>
         <NameList items={s.shortcuts ?? []} onChange={(v) => updateSettings({ shortcuts: v })} placeholder="e.g. Lights Off" />
