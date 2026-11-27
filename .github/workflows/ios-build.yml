@@ -20,6 +20,7 @@ jobs:
       - run: npx tsx test/protocol.test.ts
         env: { G2_FIXTURES: test/fixtures }
       - run: npx tsx test/wiring.test.ts
+      - run: npx tsx test/stress.test.ts
       - run: npx tsx test/core.test.ts
         env: { G2_FIXTURES: test/fixtures }
 
