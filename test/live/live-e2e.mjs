@@ -50,7 +50,8 @@ const CASES = [
 const reg = await j(await fetch(`${SERVER}/v1/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ installId: `ci-live-e2e-${variant}-${Date.now() % 100000}` }) }));
 const results = [];
 // One session per 12 requests (keeps each conversation short, like real use).
-for (let start = 0; start < CASES.length; start += 12) {
+for (let start = 0, tries = 0; start < CASES.length; start += 12) {
+  const before = results.length;
   const tok = await j(await fetch(`${SERVER}/v1/live`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${reg.token}` }, body: JSON.stringify(variant === 'locked' ? { locked: true } : {}) }));
   if (!tok.endpoints) { console.log('TOKEN ERROR', JSON.stringify(tok)); process.exit(1); }
   if (start === 0) console.log(`variant=${variant} locked=${tok.locked} version=${tok.version} model=${tok.model}`);
@@ -81,11 +82,16 @@ for (let start = 0; start < CASES.length; start += 12) {
       tools: [{ googleSearch: {} }, { functionDeclarations: TOOLS }],
       inputAudioTranscription: {}, outputAudioTranscription: {},
     } }));
-    ws.onclose = () => { clearTimeout(guard); finishCase(); resolve(); };
+    let ready = false;
+    ws.onclose = (ev) => {
+      clearTimeout(guard);
+      if (!ready) console.log(`SESSION CLOSED BEFORE SETUP: code=${ev.code} reason="${ev.reason}"`);
+      finishCase(); resolve();
+    };
     ws.onmessage = async (ev) => {
       const text = typeof ev.data === 'string' ? ev.data : Buffer.from(await ev.data.arrayBuffer()).toString('utf8');
       let m; try { m = JSON.parse(text); } catch { return; }
-      if (m.setupComplete) return next();
+      if (m.setupComplete) { ready = true; return next(); }
       if (m.toolCall?.functionCalls?.length) {
         if (settle) { clearTimeout(settle); settle = null; }
         for (const c of m.toolCall.functionCalls) cur?.tools.push(c.name);
@@ -99,6 +105,8 @@ for (let start = 0; start < CASES.length; start += 12) {
       if (sc.turnComplete) { if (settle) clearTimeout(settle); settle = setTimeout(() => { settle = null; next(); }, 1500); }
     };
   });
+  if (results.length === before && tries < 3) { tries++; console.log(`Session didn't start; retrying in 30 s (${tries}/3)`); await new Promise((r) => setTimeout(r, 30000)); start -= 12; continue; }
+  tries = 0;
 }
 const passed = results.filter((r) => r.ok).length;
 const pct = Math.round((passed / CASES.length) * 100);
