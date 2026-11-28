@@ -44,7 +44,7 @@ export function CoverGlance(p: Props) {
   const g = useGlasses();
   const info = activeGlasses();
   const own = info.caps.dataLink;
-  const orb = Math.round(Math.min(width * 0.46, height * 0.3, 210));
+  const orb = Math.round(Math.min(width * 0.42, height * 0.25, 200)); // the Orb draws its glow around this size
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
   const ampm = (now.toLocaleTimeString([], { hour: 'numeric' }).match(/[AP]M/i)?.[0] ?? '').toUpperCase();
   const date = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
