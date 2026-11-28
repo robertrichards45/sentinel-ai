@@ -1,6 +1,6 @@
 import { playAppleMusic } from './music';
 /** Calls, texts, timers, alarms and music: the everyday things you ask a phone assistant for. */
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import * as SMS from 'expo-sms';
 import * as Notifications from 'expo-notifications';
 import { Contact, ContactField, requestPermissionsAsync as contactsPermission } from 'expo-contacts';
@@ -91,6 +91,12 @@ export async function cancelTimers(): Promise<string> {
 // ---------- Music ----------
 export async function playMusic(query: string, app?: string): Promise<string> {
   const spotify = /spotify/i.test(app ?? '');
+  if (Platform.OS === 'android') {
+    // Android has no Apple Music library to drive; open the search in Spotify or YouTube Music.
+    const url = spotify ? `spotify:search:${encodeURIComponent(query)}` : `https://music.youtube.com/search?q=${encodeURIComponent(query)}`;
+    try { await Linking.openURL(url); } catch { return spotify ? "Spotify isn't installed." : "I couldn't open YouTube Music."; }
+    return `Opening ${query} in ${spotify ? 'Spotify' : 'YouTube Music'}. Tap play.`;
+  }
   if (!spotify) { const r = await playAppleMusic(query); if (r) return r; }
   const url = spotify ? `spotify:search:${encodeURIComponent(query)}` : `music://music.apple.com/us/search?term=${encodeURIComponent(query)}`;
   const ok = await Linking.canOpenURL(url).catch(() => false);

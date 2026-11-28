@@ -4,13 +4,18 @@
  * mode); nothing is written to Health and nothing leaves the phone except the short summary Alice reads.
  * General fitness guidance only, not medical advice.
  */
-import * as HK from '@kingstinct/react-native-healthkit';
+import { Platform } from 'react-native';
+import type * as HKT from '@kingstinct/react-native-healthkit';
+// Apple Health exists only on iPhone; load it lazily so the Android version never touches it.
+let HK: typeof HKT = null as any;
+if (Platform.OS === 'ios') { try { HK = require('@kingstinct/react-native-healthkit'); } catch {} }
 import { note } from './diary';
 import { briefingHooks } from './briefingHooks';
 
 const READ = ['HKQuantityTypeIdentifierStepCount', 'HKQuantityTypeIdentifierActiveEnergyBurned', 'HKQuantityTypeIdentifierRestingHeartRate', 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN', 'HKCategoryTypeIdentifierSleepAnalysis', 'HKWorkoutTypeIdentifier'] as const;
 
 async function ready(): Promise<boolean> {
+  if (!HK) return false;
   try {
     if (!HK.isHealthDataAvailable()) return false;
     return await HK.requestAuthorization({ toRead: READ as any });
@@ -20,6 +25,7 @@ async function ready(): Promise<boolean> {
 const startOfDay = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 
 export async function healthSummary(): Promise<string> {
+  if (Platform.OS !== 'ios') return "Health data comes from Apple Health on iPhone. On Android I can't read it yet, but tell me how you slept and how you feel and I'll tailor the workout.";
   if (!(await ready())) return "I can't read Apple Health on this phone. In the Health app, tap your picture, Apps, Alice, and turn on the data you want me to see.";
   const parts: string[] = [];
   try {

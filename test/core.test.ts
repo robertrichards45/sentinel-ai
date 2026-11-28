@@ -3,7 +3,8 @@ import { GLASSES, glassesInfo } from '../src/glasses/catalog';
 import { markdownToDocx, sheetsToXlsx, slidesToPptx } from '../src/officeCore';
 import { parseDocReply, parseSheetsReply, parseSlidesReply } from '../src/makeFileCore';
 import { recall, dateRange } from '../src/recallCore';
-import { appUrl } from '../src/appsCore';
+import { appUrl, androidPackage } from '../src/appsCore';
+import { isWide, splitWidths } from '../src/layoutCore';
 import { planOrder, storeLink } from '../src/shopCore';
 import { parseForesight } from '../src/foresightCore';
 import { parseMusicRequest } from '../src/musicCore';
@@ -409,6 +410,21 @@ check('English is not Spanish', !looksSpanish("Sure, what do you want me to do n
   check('gmail raw headers', raw.includes('Subject: =?UTF-8?B?') && raw.includes('In-Reply-To: <x@y>') && raw.endsWith('\r\n\r\nHi'));
   check('gmail list spoken', describeList([{ id: '1', threadId: 't', from: '"Kylee" <k@x.com>', subject: 'Saturday', date: '', snippet: '', messageId: '', unread: true }], true).startsWith('You have 1 new email: 1, from Kylee: Saturday'));
   check('email_send needs body', validateAction({ type: 'email_send', to: 'Kylee' }, modes) === null);
+}
+
+// --- 0.20: folding phones and Android ---
+{
+  check('iPhone 17 portrait is not wide', !isWide(402, 874));
+  check('Pro Max portrait is not wide', !isWide(440, 956));
+  check('iPhone Duo cover screen is not wide', !isWide(466, 678));
+  check('iPhone Duo inner screen is wide', isWide(626, 890));
+  check('Z Fold inner screen is wide', isWide(884, 1000) && isWide(673, 841));
+  check('Z Fold cover screen is not wide', !isWide(412, 914));
+  const sw = splitWidths(884);
+  check('split keeps Talk pane usable', sw.right >= 340 && sw.left >= 340 && sw.left + sw.right === 884, JSON.stringify(sw));
+  check('android spotify package', androidPackage('spotify')?.pkg === 'com.spotify.music');
+  check('android maps package', androidPackage('google maps')?.pkg === 'com.google.android.apps.maps');
+  check('android unknown app', androidPackage('zzqq') === null);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

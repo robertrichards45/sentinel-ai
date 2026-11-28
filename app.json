@@ -2,7 +2,7 @@
   "expo": {
     "name": "Alice",
     "slug": "alice",
-    "version": "0.19.3",
+    "version": "0.20.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.robert.sentinelai",
-      "buildNumber": "47",
+      "buildNumber": "48",
       "infoPlist": {
         "CFBundleDisplayName": "Alice",
         "NSBluetoothAlwaysUsageDescription": "Alice connects to your G2 glasses over Bluetooth to read status, photo counts and button events.",
@@ -150,6 +150,33 @@
     ],
     "extra": {
       "googleIosClientId": "651257358617-beuha076g6v4nig55gk42u33npldna5t.apps.googleusercontent.com"
+    },
+    "android": {
+      "package": "com.robert.alice",
+      "versionCode": 48,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#E8F3FD"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_CONTACTS",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.CALL_PHONE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
     }
   }
 }

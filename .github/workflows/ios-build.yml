@@ -83,3 +83,49 @@ jobs:
           cp SENTINEL-AI-unsigned.ipa "Alice-$VER.ipa"
           gh release delete latest --yes --cleanup-tag 2>/dev/null || true
           gh release create latest Alice.ipa "Alice-$VER.ipa" --title "Alice $VER" --notes "Install with Sideloadly. Version $VER, built from ${GITHUB_SHA::7}." --latest
+
+  android:
+    # The Android version (Galaxy Z Fold and other Android phones). Output: an installable .apk.
+    needs: [test, live]
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - run: npm ci
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean
+        env: { CI: 1 }
+      - name: Build release APK (64-bit phones)
+        working-directory: android
+        run: |
+          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --stacktrace 2>&1 | tail -n 120
+          ls -lh app/build/outputs/apk/release/
+          test -f app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Alice-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+  android-publish:
+    # Adds the .apk to the same "latest" release as the iPhone build:
+    # https://github.com/robertrichards45/sentinel-ai/releases/latest/download/Alice.apk
+    needs: [ios, android]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: Alice-apk }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(node -p "require('./app.json').expo.version")
+          cp app-release.apk Alice.apk
+          cp app-release.apk "Alice-$VER.apk"
+          gh release upload latest Alice.apk "Alice-$VER.apk" --clobber

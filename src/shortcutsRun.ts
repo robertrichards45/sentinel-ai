@@ -3,7 +3,7 @@
  * and other apps. iOS opens the Shortcuts app to run it and comes straight back to Alice afterwards.
  * Names the user lists in Settings are given to Alice so she can match what you say to the right shortcut.
  */
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { getSettings } from './settings';
 import { note } from './diary';
 import { pickShortcut } from './matchCore';
@@ -11,6 +11,7 @@ export { pickShortcut };
 
 
 export async function runShortcut(name: string): Promise<string> {
+  if (Platform.OS !== 'ios') return 'Siri Shortcuts are an iPhone feature. On Android I can control your smart home through Home Assistant, IFTTT or webhooks in Settings, Connections.';
   const pick = pickShortcut(name, getSettings().shortcuts ?? []);
   const url = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(pick)}&x-success=${encodeURIComponent('alice://done')}&x-error=${encodeURIComponent('alice://shortcut-failed')}`;
   note('shortcut', { name: pick });

@@ -15,3 +15,22 @@ export function appUrl(name: string): { url: string; label: string } | null {
   for (const [re, url, label] of APPS) if (re.test(n)) return { url, label };
   return null;
 }
+
+/** The same apps on Android, by package name (opened with an Android launch intent). */
+const ANDROID: Record<string, string> = {
+  'Maps': 'com.google.android.apps.maps', 'Google Maps': 'com.google.android.apps.maps', 'Waze': 'com.waze',
+  'Music': 'com.google.android.apps.youtube.music', 'Spotify': 'com.spotify.music', 'YouTube': 'com.google.android.youtube', 'YouTube Music': 'com.google.android.apps.youtube.music', 'Pandora': 'com.pandora.android', 'Podcasts': 'com.google.android.apps.podcasts', 'Audible': 'com.audible.application',
+  'Netflix': 'com.netflix.mediaclient', 'Hulu': 'com.hulu.plus', 'Disney+': 'com.disney.disneyplus', 'Prime Video': 'com.amazon.avod.thirdpartyclient', 'Max': 'com.wbd.stream',
+  'Messages': 'com.samsung.android.messaging', 'Phone': 'com.samsung.android.dialer', 'Mail': 'com.google.android.gm', 'Gmail': 'com.google.android.gm', 'Outlook': 'com.microsoft.office.outlook',
+  'WhatsApp': 'com.whatsapp', 'Facebook': 'com.facebook.katana', 'Messenger': 'com.facebook.orca', 'Instagram': 'com.instagram.android', 'Snapchat': 'com.snapchat.android', 'TikTok': 'com.zhiliaoapp.musically', 'X': 'com.twitter.android', 'Discord': 'com.discord', 'Telegram': 'org.telegram.messenger', 'Signal': 'org.thoughtcrime.securesms', 'LinkedIn': 'com.linkedin.android', 'Reddit': 'com.reddit.frontpage', 'Pinterest': 'com.pinterest', 'Threads': 'com.instagram.barcelona',
+  'Teams': 'com.microsoft.teams', 'Zoom': 'us.zoom.videomeetings', 'Slack': 'com.Slack', 'Word': 'com.microsoft.office.word', 'Excel': 'com.microsoft.office.excel', 'PowerPoint': 'com.microsoft.office.powerpoint', 'Google Drive': 'com.google.android.apps.docs', 'Chrome': 'com.android.chrome',
+  'Uber': 'com.ubercab', 'Lyft': 'me.lyft.android', 'DoorDash': 'com.dd.doordash', 'Uber Eats': 'com.ubercab.eats', 'Grubhub': 'com.grubhub.android', 'Amazon': 'com.amazon.mShop.android.shopping', 'Walmart': 'com.walmart.android',
+  'Venmo': 'com.venmo', 'Cash App': 'com.squareup.cash', 'PayPal': 'com.paypal.android.p2pmobile', 'Meta AI': 'com.facebook.stella',
+  'Calendar': 'com.samsung.android.calendar', 'Reminders': 'com.samsung.android.app.reminder', 'Notes': 'com.samsung.android.app.notes', 'Photos': 'com.sec.android.gallery3d', 'Files': 'com.sec.android.app.myfiles', 'App Store': 'com.android.vending', 'Wallet': 'com.google.android.apps.walletnfcrel', 'Health': 'com.sec.android.app.shealth', 'Find My': 'com.google.android.apps.adm', 'Clock': 'com.sec.android.app.clockpackage', 'Weather': 'com.sec.android.daemonapp', 'Calculator': 'com.sec.android.app.popupcalculator', 'Settings': 'com.android.settings',
+};
+export function androidPackage(name: string): { pkg: string; label: string } | null {
+  const a = appUrl(name);
+  if (!a) return null;
+  const pkg = ANDROID[a.label];
+  return pkg ? { pkg, label: a.label } : null;
+}

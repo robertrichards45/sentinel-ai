@@ -1,6 +1,7 @@
 import { note } from './diary';
 import { BleManager, Device, Subscription, State } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
+import { PermissionsAndroid, Platform } from 'react-native';
 import { getSettings, onSettings } from './settings';
 import { ECHO_3A, helloSequence, GLASSES_COMMANDS, GlassesCommand, UUID, ADV_NAME, ADV_COMPANY_ID, GlassesEvent, parseChannelA, parseChannelB, parseAdvert, hex } from './protocol';
 
@@ -63,6 +64,14 @@ class GlassesLink {
   /** Find the glasses: first among peripherals iOS already has connected, then by scanning. */
   async connect(): Promise<void> {
     this.wantConnected = true;
+    if (Platform.OS === 'android') {
+      // Android 12+ asks separately for finding and connecting to nearby Bluetooth devices.
+      const r = await PermissionsAndroid.requestMultiple([PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN, PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT]).catch(() => ({} as any));
+      if (Object.values(r).some((v) => v === 'denied' || v === 'never_ask_again')) {
+        this.setState('error', 'Alice needs the Nearby devices permission to find your glasses. Allow it in Settings, Apps, Alice, Permissions.');
+        return;
+      }
+    }
     const bt = await this.manager.state();
     if (bt !== State.PoweredOn) {
       this.setState('bluetooth-off', String(bt));

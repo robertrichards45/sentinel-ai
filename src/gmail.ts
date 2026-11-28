@@ -7,6 +7,7 @@
  */
 import * as WebBrowser from 'expo-web-browser';
 import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { Contact, ContactField, requestPermissionsAsync as contactsPermission } from 'expo-contacts';
@@ -27,12 +28,13 @@ let lastOpened: Msg | null = null;
 
 const b64url = (b: Uint8Array | Buffer) => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-export const gmailConfigured = () => !!CLIENT_ID;
+export const gmailConfigured = () => !!CLIENT_ID && Platform.OS === 'ios';
 export async function gmailConnected() { return !!(await SecureStore.getItemAsync('gmail-refresh', KC).catch(() => null)); }
 
 /** Opens Google's sign-in page; you pick the account and allow Alice. */
 export async function connectGmail(): Promise<string> {
   if (!CLIENT_ID) return 'Gmail is not set up in this build yet.';
+  if (Platform.OS !== 'ios') return 'Gmail works on the iPhone version for now. The Android version needs its own Google key, which is coming.';
   const verifier = b64url(Crypto.getRandomBytes(32));
   const challenge = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, { encoding: Crypto.CryptoEncoding.BASE64 })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const state = b64url(Crypto.getRandomBytes(12));

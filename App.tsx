@@ -46,6 +46,7 @@ import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
 import { C, F, Glass, Ionicons } from './src/ui';
+import { useLayout } from './src/layout';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 export type Tab = 'home' | 'assist' | 'media' | 'memory' | 'settings';
@@ -58,16 +59,16 @@ const TABS: { id: Tab; label: string; icon: IconName; iconOn: IconName }[] = [
 ];
 
 /** Floating frosted-glass tab bar. The active tab gets a violet glow. */
-function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+function TabBar({ tab, setTab, width }: { tab: Tab; setTab: (t: Tab) => void; width?: number }) {
   const g = useGlasses();
   const [ls, setLs] = useState<LiveState>(live.state);
   useEffect(() => live.subscribe({ state: (st) => setLs(st) }), []);
   const talking = ls !== 'off' && ls !== 'error';
   const inset = useSafeAreaInsets();
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
+    <View pointerEvents="box-none" style={width ? { position: 'absolute', left: 14, width: width - 28, bottom: Math.max(inset.bottom, 12) } : { position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
       <Glass radius={30} intensity={50} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 6, backgroundColor: 'rgba(10,12,30,0.55)' }}>
-        {TABS.map((t) => {
+        {TABS.filter((t) => !(width && t.id === 'assist')).map((t) => {
           const on = tab === t.id;
           const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
           return (
@@ -88,6 +89,7 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
 
 function Shell() {
   const inset = useSafeAreaInsets();
+  const lay = useLayout(); // reflows live when a folding phone opens or closes
   const [fontsLoaded] = useFonts({ Sora_300Light, Sora_600SemiBold, Sora_700Bold, Inter_400Regular, Inter_500Medium, Inter_600SemiBold });
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>('home');
@@ -141,12 +143,28 @@ function Shell() {
       <StatusBar style="light" />
       <Backdrop />
       <View style={{ flex: 1, paddingTop: inset.top }}>
-        {ready && fontsLoaded && needsSetup ? <Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); if (!getSettings().toured) setTour(true); }} /> : ready && fontsLoaded && tour ? <Tour onDone={() => { setTour(false); setTab('assist' as any); }} /> : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
+        {ready && fontsLoaded && needsSetup ? <Centered wide={lay.wide}><Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); if (!getSettings().toured) setTour(true); }} /></Centered>
+          : ready && fontsLoaded && tour ? <Centered wide={lay.wide}><Tour onDone={() => { setTour(false); setTab('assist' as any); }} /></Centered>
+          : ready && fontsLoaded && lay.wide ? (
+            // Unfolded: the screen you picked on the left, Alice always ready to talk on the right.
+            <View style={{ flex: 1, flexDirection: 'row' }}>
+              <View style={{ width: lay.left }}>{screens[tab === 'assist' ? 'home' : tab]}</View>
+              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              <View style={{ width: lay.right - 1 }}>{screens.assist}</View>
+            </View>
+          )
+          : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
       {ready && fontsLoaded && !needsSetup && !tour ? <ActivityBanner /> : null}
-      {ready && fontsLoaded && !needsSetup && !tour ? <TabBar tab={tab} setTab={setTab} /> : null}
+      {ready && fontsLoaded && !needsSetup && !tour ? <TabBar tab={tab} setTab={setTab} width={lay.wide ? lay.left : undefined} /> : null}
     </View>
   );
+}
+
+/** Setup and tour read best at phone width, so on an unfolded screen they sit in a centered column. */
+function Centered({ wide, children }: { wide: boolean; children: React.ReactNode }) {
+  if (!wide) return <>{children}</>;
+  return <View style={{ flex: 1, alignItems: 'center' }}><View style={{ flex: 1, width: '100%', maxWidth: 560 }}>{children}</View></View>;
 }
 
 export default function App() {

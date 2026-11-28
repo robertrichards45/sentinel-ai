@@ -8,6 +8,10 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.20.0', date: '2026-11-27', items: [
+    'I fit folding phones: open an iPhone Duo or Galaxy Z Fold and I spread out, with your screen on the left and me ready to talk on the right',
+    'There is now an Android version of me for the Galaxy Z Fold and other Android phones',
+  ] },
   { version: '0.19.3', date: '2026-11-27', items: [
     'Gmail is ready: tap Connect Gmail in Settings once, then ask me to check, read, reply to, send or archive email',
   ] },

@@ -3,7 +3,7 @@
  * Uses the iPhone's own Music player (your library and anything you've added from Apple Music), so it works
  * for every user with no keys. Songs that aren't in your library open in the Music app's search instead.
  */
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { AliceMusic } from '../modules/alice-music';
 import { note } from './diary';
 import { parseMusicRequest } from './musicCore';
@@ -23,7 +23,7 @@ export async function playAppleMusic(query: string): Promise<string | null> {
 }
 
 export async function musicControl(command: string): Promise<string> {
-  if (!AliceMusic) return "This version can't control music yet.";
+  if (!AliceMusic) return Platform.OS === 'android' ? "On Android, use the music app's own controls or your glasses button for pause and skip. I can start any song for you." : "This version can't control music yet.";
   if (command === 'now_playing') {
     const n = await AliceMusic.nowPlaying().catch(() => null);
     if (!n || !n.title) return 'Nothing is playing in Apple Music right now.';
