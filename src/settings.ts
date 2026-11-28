@@ -30,6 +30,7 @@ export type Settings = {
   toured: boolean; // has seen the 'what Alice can do' tour
   noiseFilter: boolean; // ignore background noise on the phone mic
   cameraHidden: boolean; // live camera runs without showing the preview
+  foldable?: boolean; // this phone has been seen unfolded (iPhone Duo, Galaxy Z Fold)
   customWords: string[]; // names/words to bias speech recognition toward
   shortcuts: string[]; // Siri Shortcut names Alice may run
   emergencyContacts: string[]; // names from Contacts, or phone numbers

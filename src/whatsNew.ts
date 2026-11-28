@@ -8,6 +8,11 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.20.1', date: '2026-11-28', items: [
+    'On iPhone Duo I now fill the whole inner screen instead of sitting in a small window',
+    'When your phone is folded I show a clean glance screen: the time, me, what I just said, and one big Talk button',
+    'Opened up, there is a side rail on the left and I stay ready to talk on the right',
+  ] },
   { version: '0.20.0', date: '2026-11-27', items: [
     'I fit folding phones: open an iPhone Duo or Galaxy Z Fold and I spread out, with your screen on the left and me ready to talk on the right',
     'There is now an Android version of me for the Galaxy Z Fold and other Android phones',

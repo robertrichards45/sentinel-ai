@@ -4,7 +4,7 @@ import { markdownToDocx, sheetsToXlsx, slidesToPptx } from '../src/officeCore';
 import { parseDocReply, parseSheetsReply, parseSlidesReply } from '../src/makeFileCore';
 import { recall, dateRange } from '../src/recallCore';
 import { appUrl, androidPackage } from '../src/appsCore';
-import { isWide, splitWidths } from '../src/layoutCore';
+import { isWide, splitWidths, isCoverShape, isFoldModel } from '../src/layoutCore';
 import { planOrder, storeLink } from '../src/shopCore';
 import { parseForesight } from '../src/foresightCore';
 import { parseMusicRequest } from '../src/musicCore';
@@ -425,6 +425,10 @@ check('English is not Spanish', !looksSpanish("Sure, what do you want me to do n
   check('android spotify package', androidPackage('spotify')?.pkg === 'com.spotify.music');
   check('android maps package', androidPackage('google maps')?.pkg === 'com.google.android.apps.maps');
   check('android unknown app', androidPackage('zzqq') === null);
+  check('Duo cover screen detected', isCoverShape(466, 678));
+  check('regular iPhones are not a cover screen', !isCoverShape(402, 874) && !isCoverShape(440, 956) && !isCoverShape(375, 667));
+  check('inner screen is not a cover screen', !isCoverShape(626, 890));
+  check('Z Fold model detected', isFoldModel('SM-F966U') && isFoldModel('SM-F956B') && !isFoldModel('SM-F741U') && !isFoldModel('SM-S938U'));
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

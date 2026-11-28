@@ -35,7 +35,7 @@ import { checkUpdated } from './src/whatsNew';
 import { onTour } from './src/triggers';
 import { startGlasses, activeGlasses as glassesInfoActive } from './src/glasses/connector';
 import { maybeHeadsUp } from './src/headsUp';
-import { getSettings, onSettings } from './src/settings';
+import { getSettings, onSettings, updateSettings } from './src/settings';
 import './src/headsUp';
 import './src/learn';
 import './src/navigation'; // registers the background directions task at startup
@@ -46,7 +46,7 @@ import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
 import { C, F, Glass, Ionicons } from './src/ui';
-import { useLayout } from './src/layout';
+import { useLayout, RAIL, knownFoldable } from './src/layout';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 export type Tab = 'home' | 'assist' | 'media' | 'memory' | 'settings';
@@ -59,16 +59,16 @@ const TABS: { id: Tab; label: string; icon: IconName; iconOn: IconName }[] = [
 ];
 
 /** Floating frosted-glass tab bar. The active tab gets a violet glow. */
-function TabBar({ tab, setTab, width }: { tab: Tab; setTab: (t: Tab) => void; width?: number }) {
+function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const g = useGlasses();
   const [ls, setLs] = useState<LiveState>(live.state);
   useEffect(() => live.subscribe({ state: (st) => setLs(st) }), []);
   const talking = ls !== 'off' && ls !== 'error';
   const inset = useSafeAreaInsets();
   return (
-    <View pointerEvents="box-none" style={width ? { position: 'absolute', left: 14, width: width - 28, bottom: Math.max(inset.bottom, 12) } : { position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
       <Glass radius={30} intensity={50} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 6, backgroundColor: 'rgba(10,12,30,0.55)' }}>
-        {TABS.filter((t) => !(width && t.id === 'assist')).map((t) => {
+        {TABS.map((t) => {
           const on = tab === t.id;
           const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
           return (
@@ -77,6 +77,37 @@ function TabBar({ tab, setTab, width }: { tab: Tab; setTab: (t: Tab) => void; wi
               <View style={on ? { shadowColor: C.violet, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : undefined}>
                 <Ionicons name={on ? t.iconOn : t.icon} size={23} color={on ? C.ink : C.sub} />
                 {badge ? <View style={{ position: 'absolute', right: -5, top: -3, width: 9, height: 9, borderRadius: 5, backgroundColor: badge, shadowColor: badge, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } }} /> : null}
+              </View>
+              <Text style={{ fontSize: 11, fontFamily: on ? F.semibold : F.regular, color: on ? C.ink : C.sub }}>{t.label}</Text>
+            </Pressable>
+          );
+        })}
+      </Glass>
+    </View>
+  );
+}
+
+/**
+ * Unfolded: a slim vertical rail on the left edge (where the thumb rests when holding an open foldable),
+ * like Apple's own apps on iPhone Duo. When Talk has its own column, it isn't repeated in the rail.
+ */
+function Rail({ tab, setTab, showTalk }: { tab: Tab; setTab: (t: Tab) => void; showTalk: boolean }) {
+  const g = useGlasses();
+  const [ls, setLs] = useState<LiveState>(live.state);
+  useEffect(() => live.subscribe({ state: (st) => setLs(st) }), []);
+  const talking = ls !== 'off' && ls !== 'error';
+  return (
+    <View style={{ width: RAIL, alignItems: 'center', justifyContent: 'center', paddingVertical: 16 }}>
+      <Glass radius={34} intensity={50} style={{ paddingVertical: 14, paddingHorizontal: 8, gap: 10, backgroundColor: 'rgba(10,12,30,0.5)' }}>
+        {TABS.filter((t) => showTalk || t.id !== 'assist').map((t) => {
+          const on = tab === t.id;
+          const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
+          return (
+            <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => setTab(t.id)}
+              style={{ width: 62, alignItems: 'center', paddingVertical: 9, gap: 4, borderRadius: 22, backgroundColor: on ? 'rgba(140,107,255,0.22)' : 'transparent' }}>
+              <View style={on ? { shadowColor: C.violet, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : undefined}>
+                <Ionicons name={on ? t.iconOn : t.icon} size={23} color={on ? C.ink : C.sub} />
+                {badge ? <View style={{ position: 'absolute', right: -5, top: -3, width: 9, height: 9, borderRadius: 5, backgroundColor: badge }} /> : null}
               </View>
               <Text style={{ fontSize: 11, fontFamily: on ? F.semibold : F.regular, color: on ? C.ink : C.sub }}>{t.label}</Text>
             </Pressable>
@@ -96,6 +127,14 @@ function Shell() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [tour, setTour] = useState(false);
   useEffect(() => onTour(() => setTour(true)), []);
+  // Folding phones: remember this phone folds once it has been seen open, and go back to the cover
+  // screen's own "glance" each time it's closed.
+  const [coverFull, setCoverFull] = useState(false);
+  useEffect(() => {
+    if (!ready) return;
+    if ((lay.wide || knownFoldable()) && !getSettings().foldable) updateSettings({ foldable: true });
+    if (lay.wide) setCoverFull(false);
+  }, [lay.wide, ready]);
 
   useEffect(() => {
     (async () => {
@@ -110,7 +149,7 @@ function Shell() {
       }
     })();
     // Hands-free starts: alice://talk (Siri shortcut, Action Button) and the glasses' button.
-    const talk = () => { setTab('assist'); requestListen(); };
+    const talk = () => { setTab('assist'); setCoverFull(false); requestListen(); };
     const offWake = onWake(talk);
     const offSetup = onSettings((st) => { if (!st.glassesModel) setNeedsSetup(true); });
     wakeWordReady();
@@ -146,17 +185,22 @@ function Shell() {
         {ready && fontsLoaded && needsSetup ? <Centered wide={lay.wide}><Onboarding onDone={() => { setNeedsSetup(false); startGlasses(); if (!getSettings().toured) setTour(true); }} /></Centered>
           : ready && fontsLoaded && tour ? <Centered wide={lay.wide}><Tour onDone={() => { setTour(false); setTab('assist' as any); }} /></Centered>
           : ready && fontsLoaded && lay.wide ? (
-            // Unfolded: the screen you picked on the left, Alice always ready to talk on the right.
-            <View style={{ flex: 1, flexDirection: 'row' }}>
-              <View style={{ width: lay.left }}>{screens[tab === 'assist' ? 'home' : tab]}</View>
-              <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-              <View style={{ width: lay.right - 1 }}>{screens.assist}</View>
+            // Unfolded: rail on the left, the screen you picked, and (when there's room) Alice ready to talk on the right.
+            <View style={{ flex: 1, flexDirection: 'row', paddingLeft: lay.inset.left, paddingRight: lay.inset.right }}>
+              <Rail tab={lay.split && tab === 'assist' ? 'home' : tab} setTab={setTab} showTalk={!lay.split} />
+              {lay.split ? <>
+                <View style={{ width: lay.left }}>{screens[tab === 'assist' ? 'home' : tab]}</View>
+                <View style={{ width: 1, marginVertical: 24, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                <View style={{ width: lay.right - 1 }}><Assist orbSize={200} /></View>
+              </> : <View style={{ flex: 1 }}>{tab === 'assist' ? <Assist orbSize={230} /> : screens[tab]}</View>}
             </View>
           )
+          : ready && fontsLoaded && lay.cover && !coverFull ? <Assist variant="cover" onOpenApp={() => { setCoverFull(true); setTab('home'); }} />
           : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
       {ready && fontsLoaded && !needsSetup && !tour ? <ActivityBanner /> : null}
-      {ready && fontsLoaded && !needsSetup && !tour ? <TabBar tab={tab} setTab={setTab} width={lay.wide ? lay.left : undefined} /> : null}
+      {ready && fontsLoaded && !needsSetup && !tour && !lay.wide && !(lay.cover && !coverFull)
+        ? <TabBar tab={tab} setTab={(t) => { if (lay.cover && t === 'assist') setCoverFull(false); else setTab(t); }} /> : null}
     </View>
   );
 }

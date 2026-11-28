@@ -23,6 +23,7 @@ import { Orb, VoiceBars, OrbState } from '../Orb';
 import { LiveCamera } from '../LiveCamera';
 import { onLook } from '../triggers';
 import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
+import { CoverGlance } from './CoverGlance';
 
 const HINT: Record<string, string> = {
   general: 'Ask anything. Try "remind me to call the VA at 9 tomorrow".',
@@ -36,7 +37,7 @@ const HINT: Record<string, string> = {
   navigator: 'Try "where am I" or "walking directions to…".',
 };
 
-export default function Assist() {
+export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: { variant?: 'full' | 'cover'; onOpenApp?: () => void; orbSize?: number } = {}) {
   useKeepAwake();
   const s = useSettings();
   const rec = useAudioRecorder(VOICE_PRESET);
@@ -179,6 +180,19 @@ export default function Assist() {
   const status = s.liveConversation ? liveStatus[liveState] : listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
   const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
 
+  if (variant === 'cover') {
+    const lastAlice = s.liveConversation ? [...lines].reverse().find((l) => l.who === 'alice')?.text : log[0]?.alice;
+    const lastYou = s.liveConversation ? [...lines].reverse().find((l) => l.who === 'you')?.text : log[0]?.you;
+    const active = s.liveConversation ? liveOn : listening;
+    return (
+      <CoverGlance state={state} status={status} lastAlice={err || lastAlice} lastYou={err ? undefined : lastYou} isError={!!err}
+        talking={active} voiceActive={s.liveConversation ? liveState === 'listening' : listening}
+        onTalk={s.liveConversation ? toggleLive : () => (listeningRef.current ? finish() : speaking ? stopSpeaking() : listenHandsFree())}
+        look={look} onLook={() => setLook(!look)} cameraHidden={s.cameraHidden}
+        onOpenApp={onOpenApp} />
+    );
+  }
+
   return (
     <ScrollView style={S.screen} contentContainerStyle={S.pad} keyboardShouldPersistTaps="handled">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 20, paddingTop: 4 }} style={{ marginHorizontal: -20, paddingLeft: 20 }}>
@@ -203,7 +217,7 @@ export default function Assist() {
           onPressOut={s.liveConversation ? undefined : () => stop()}
           onPress={s.liveConversation ? toggleLive : () => speaking && stopSpeaking()}
           accessibilityRole="button" accessibilityLabel={s.liveConversation ? (liveOn ? 'End conversation with Alice' : 'Start conversation with Alice') : listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
-          <Orb size={250} state={state} />
+          <Orb size={orbSize} state={state} />
         </Pressable>
         <View style={{ height: 44, justifyContent: 'center' }}>
           {(s.liveConversation ? liveState === 'listening' : listening) ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}

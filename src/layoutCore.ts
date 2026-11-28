@@ -7,6 +7,19 @@ export function isWide(width: number, height: number): boolean {
 
 /** Width of the left (current screen) pane when the Talk pane sits beside it. */
 export function splitWidths(width: number): { left: number; right: number } {
-  const right = Math.round(Math.min(Math.max(width * 0.44, 340), 520));
+  const right = Math.round(Math.min(Math.max(width * 0.46, 340), 520));
   return { left: width - right, right };
 }
+
+/**
+ * Is this the cover (outer) screen of a folding phone? The iPhone Duo cover screen is unusually wide for its
+ * height (about 466 x 678 pt), unlike any regular iPhone (about 0.46). The Z Fold cover screen is phone-shaped,
+ * so Android also checks the model (see layout.ts).
+ */
+export function isCoverShape(width: number, height: number): boolean {
+  const r = width / Math.max(height, 1);
+  return width < 600 && r >= 0.6 && r <= 0.9;
+}
+
+/** Galaxy Z Fold model numbers start with SM-F9 (SM-F7 is the Flip, which has no big inner screen). */
+export const isFoldModel = (model?: string) => !!model && (/^SM-F9\d/i.test(model) || /\bfold\b/i.test(model));

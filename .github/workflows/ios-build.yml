@@ -39,7 +39,7 @@ jobs:
 
   ios:
     needs: [test, live]
-    runs-on: macos-26
+    runs-on: xcode-27 # GitHub's Xcode 27 image (macOS 27); iPhone Duo needs the iOS 27.1 SDK
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -51,10 +51,12 @@ jobs:
           ls -d /Applications/Xcode*.app || true
           X=$(ls -d /Applications/Xcode_27*.app /Applications/Xcode_28*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n1)
           [ -z "$X" ] && X=$(ls -d /Applications/Xcode_27*.app /Applications/Xcode_28*.app 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$X" ] && xcodebuild -version | grep -q "Xcode 2[7-9]"; then X=$(xcode-select -p | sed 's#/Contents/Developer##'); fi
           if [ -z "$X" ]; then echo "::error::No Xcode 27 on this runner"; exit 1; fi
           sudo xcode-select -s "$X/Contents/Developer"
           xcodebuild -version
           xcodebuild -showsdks | grep -i iphoneos
+          xcodebuild -showsdks | grep -Eq "iphoneos27\.[1-9]|iphoneos2[8-9]" || { echo "::error::Need the iOS 27.1 SDK or newer for iPhone Duo"; exit 1; }
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean
         env: { CI: 1 }
