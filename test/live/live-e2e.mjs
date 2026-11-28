@@ -86,6 +86,11 @@ for (let start = 0, tries = 0; start < CASES.length; start += 12) {
     ws.onclose = (ev) => {
       clearTimeout(guard);
       if (!ready) console.log(`SESSION CLOSED BEFORE SETUP: code=${ev.code} reason="${ev.reason}"`);
+      if (!ready && /credits are depleted|billing|quota/i.test(ev.reason ?? '')) {
+        // An account problem, not an app bug: don't block the build, but make it impossible to miss.
+        console.log('::warning::Gemini account has no credits left. Alice cannot talk until it is topped up in Google AI Studio. Live test skipped.');
+        process.exit(0);
+      }
       finishCase(); resolve();
     };
     ws.onmessage = async (ev) => {
