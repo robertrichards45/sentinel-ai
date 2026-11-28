@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# Only the newest push builds and publishes; an older run can't overwrite a newer release.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
