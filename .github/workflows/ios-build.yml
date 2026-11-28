@@ -46,11 +46,18 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm }
       - run: npm ci
+      - name: Use Xcode 27.1 or newer (needed to fill the iPhone Duo screens; older SDKs are letterboxed)
+        run: |
+          ls -d /Applications/Xcode*.app || true
+          X=$(ls -d /Applications/Xcode_27*.app /Applications/Xcode_28*.app 2>/dev/null | grep -v -i beta | sort -V | tail -n1)
+          [ -z "$X" ] && X=$(ls -d /Applications/Xcode_27*.app /Applications/Xcode_28*.app 2>/dev/null | sort -V | tail -n1)
+          if [ -z "$X" ]; then echo "::error::No Xcode 27 on this runner"; exit 1; fi
+          sudo xcode-select -s "$X/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean
         env: { CI: 1 }
-      - name: Show Xcode
-        run: xcodebuild -version
       - name: Build (Release, unsigned)
         run: |
           set -o pipefail
