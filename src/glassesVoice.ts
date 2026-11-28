@@ -1,3 +1,4 @@
+import { liveWanted } from './live';
 import { note } from './diary';
 /**
  * Talk to Alice through the glasses themselves (verified protocol, see src/protocol.ts and DIAGNOSTIC_LOG 22):
@@ -57,7 +58,7 @@ onSpeaking((on) => { speaking = on; });
 const liveUp = () => live.state === 'listening' || live.state === 'speaking' || live.state === 'thinking';
 /** Open the live conversation in advance (on the button press), so it's ready by the time you finish talking. */
 function warmLive() {
-  if (!getSettings().liveConversation || isAsleep() || getSettings().privacyMode) return;
+  if (!liveWanted() || isAsleep() || getSettings().privacyMode) return;
   if (live.state === 'off' || live.state === 'error') { liveByGlasses = true; live.start({ mic: false }); }
   if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }
 }
@@ -65,7 +66,7 @@ function warmLive() {
 function startTurn() {
   recording = true; frames = []; spoke = 0; quiet = 0;
   // Stream your voice into the live conversation while you talk (no speech-to-text step afterwards).
-  if (getSettings().liveConversation && liveUp()) streamStart();
+  if (liveWanted() && liveUp()) streamStart();
   emit('state', 'listening');
 }
 
@@ -119,7 +120,7 @@ async function finish() {
     const audio = { mime: 'audio/ogg', base64: Buffer.from(opusToOgg(f)).toString('base64') };
     // Fast path: answer through the live conversation (streams Alice's voice as it is generated, ~2-3 s)
     // instead of the one-question path (whole answer, then a separate voice step, 5-10 s).
-    const useLive = getSettings().liveConversation;
+    const useLive = liveWanted();
     if (isAsleep()) { emit('state', 'idle'); endSession(); return; }
     if (useLive && (live.state === 'off' || live.state === 'error')) { liveByGlasses = true; live.start({ mic: false }); }
     if (liveIdle) { clearTimeout(liveIdle); liveIdle = null; }

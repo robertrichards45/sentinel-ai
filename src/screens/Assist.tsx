@@ -12,17 +12,17 @@ import { onListenRequest } from '../triggers';
 import { setLastAttachment } from '../attachments';
 import { offlineNow, checkNet } from '../netState';
 import { offlineTurn } from '../offline';
-import { live, LiveState, LiveLine } from '../live';
+import { live, LiveState, LiveLine, liveBlocked } from '../live';
 import { onGlassesVoice } from '../glassesVoice';
 import { updateSettings } from '../settings';
 import { useSettings } from '../hooks';
 import { setPhoneMic } from '../micState';
 import { goToSleep, wakeUp } from '../quiet';
-import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking } from '../voice';
+import { VOICE_PRESET, enableVoiceSession, chooseInput, stopSpeaking, prepareRecorder, onSpeaking, speak } from '../voice';
 import { Orb, VoiceBars, OrbState } from '../Orb';
 import { LiveCamera } from '../LiveCamera';
 import { onLook } from '../triggers';
-import { Btn, C, Card, F, Glass, Ionicons, S } from '../ui';
+import { Btn, C, Card, F, Glass, Ionicons, S, tick } from '../ui';
 import { CoverGlance } from './CoverGlance';
 
 const HINT: Record<string, string> = {
@@ -54,8 +54,15 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
   const [liveNote, setLiveNote] = useState(live.detail);
   const [lines, setLines] = useState<LiveLine[]>(live.lines);
   const liveOn = liveState !== 'off' && liveState !== 'error';
+  // Live voice is used unless it's turned off or Google refused it (out of credit): then one question at a time.
+  const useLive = s.liveConversation && !liveBlocked();
+  const fallbackRef = useRef<() => void>(() => {});
   useEffect(() => live.subscribe({
-    state: (st, detail) => { setLiveState(st); if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? ''); },
+    state: (st, detail) => {
+      setLiveState(st);
+      if (st === 'error' && liveBlocked()) { setErr(''); setLiveNote(detail ?? ''); setTimeout(() => fallbackRef.current(), 400); return; } // carry on without live voice
+      if (st === 'error') setErr(detail ?? 'The conversation stopped.'); else setLiveNote(detail ?? '');
+    },
     line: () => setLines(live.lines),
   }), []);
   const [glassesNote, setGlassesNote] = useState('');
@@ -114,9 +121,10 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
     setPhoneMic(false);
   };
   const finish = () => { handsFreeRef.current = false; setHandsFree(false); stop(true); };
+  fallbackRef.current = () => { speak("My live voice isn't available right now, so I'll answer one question at a time. Go ahead.").catch(() => {}).finally(() => listenHandsFree()); };
   const [look, setLook] = useState(false);
   useEffect(() => onLook((on) => setLook(on)), []);
-  useEffect(() => onListenRequest(() => (offlineNow() ? offlineTurn() : s.liveConversation ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
+  useEffect(() => onListenRequest(() => (offlineNow() ? offlineTurn() : useLive ? (liveOn ? undefined : toggleLive()) : listenHandsFree())));
 
   const start = async (fromHandsFree = false) => {
     if (!fromHandsFree) { pressedAt.current = Date.now(); handsFreeRef.current = false; }
@@ -176,18 +184,18 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
 
   const liveOrb: Record<LiveState, OrbState> = { off: 'idle', error: 'idle', connecting: 'thinking', listening: 'listening', thinking: 'thinking', speaking: 'speaking' };
   const liveStatus: Record<LiveState, string> = { off: 'Tap Alice to start talking', error: 'Tap Alice to try again', connecting: liveNote || 'Connecting…', listening: 'Listening… just talk', thinking: 'Thinking…', speaking: 'Speaking · just talk to interrupt' };
-  const state: OrbState = s.liveConversation ? liveOrb[liveState] : listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
-  const status = s.liveConversation ? liveStatus[liveState] : listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
+  const state: OrbState = useLive ? liveOrb[liveState] : listening ? 'listening' : busy ? 'thinking' : speaking ? 'speaking' : 'idle';
+  const status = useLive ? liveStatus[liveState] : listening ? (handsFree ? 'Listening… just talk' : 'Listening… let go to send') : busy ? 'Thinking…' : speaking ? 'Speaking · tap Alice to stop' : 'Tap Alice, or hold to talk';
   const hint = mode.id === 'translator' ? `Speak, and Alice says it in ${s.translateTo}.` : HINT[mode.id] ?? mode.prompt.slice(0, 90);
 
   if (variant === 'cover') {
-    const lastAlice = s.liveConversation ? [...lines].reverse().find((l) => l.who === 'alice')?.text : log[0]?.alice;
-    const lastYou = s.liveConversation ? [...lines].reverse().find((l) => l.who === 'you')?.text : log[0]?.you;
-    const active = s.liveConversation ? liveOn : listening;
+    const lastAlice = useLive ? [...lines].reverse().find((l) => l.who === 'alice')?.text : log[0]?.alice;
+    const lastYou = useLive ? [...lines].reverse().find((l) => l.who === 'you')?.text : log[0]?.you;
+    const active = useLive ? liveOn : listening;
     return (
       <CoverGlance state={state} status={status} lastAlice={err || lastAlice} lastYou={err ? undefined : lastYou} isError={!!err}
-        talking={active} voiceActive={s.liveConversation ? liveState === 'listening' : listening}
-        onTalk={s.liveConversation ? toggleLive : () => (listeningRef.current ? finish() : speaking ? stopSpeaking() : listenHandsFree())}
+        talking={active} voiceActive={useLive ? liveState === 'listening' : listening}
+        onTalk={useLive ? toggleLive : () => (listeningRef.current ? finish() : speaking ? stopSpeaking() : listenHandsFree())}
         look={look} onLook={() => setLook(!look)} cameraHidden={s.cameraHidden}
         onOpenApp={onOpenApp} />
     );
@@ -213,16 +221,16 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
       </ScrollView>
 
       <View style={{ alignItems: 'center', gap: 6 }}>
-        <Pressable onPressIn={s.liveConversation ? undefined : () => (listeningRef.current && handsFreeRef.current ? finish() : start())}
-          onPressOut={s.liveConversation ? undefined : () => stop()}
-          onPress={s.liveConversation ? toggleLive : () => speaking && stopSpeaking()}
-          accessibilityRole="button" accessibilityLabel={s.liveConversation ? (liveOn ? 'End conversation with Alice' : 'Start conversation with Alice') : listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
+        <Pressable onPressIn={useLive ? undefined : () => (listeningRef.current && handsFreeRef.current ? finish() : start())}
+          onPressOut={useLive ? undefined : () => stop()}
+          onPress={useLive ? () => { tick(); toggleLive(); } : () => speaking && stopSpeaking()}
+          accessibilityRole="button" accessibilityLabel={useLive ? (liveOn ? 'End conversation with Alice' : 'Start conversation with Alice') : listening ? 'Listening. Release to send.' : 'Hold to talk to Alice'}>
           <Orb size={orbSize} state={state} />
         </Pressable>
         <View style={{ height: 44, justifyContent: 'center' }}>
-          {(s.liveConversation ? liveState === 'listening' : listening) ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
+          {(useLive ? liveState === 'listening' : listening) ? <VoiceBars active /> : <Text style={{ fontFamily: F.light, fontSize: 24, color: C.ink, letterSpacing: -0.3 }}>{status}</Text>}
         </View>
-        <Text style={[S.dim, { textAlign: 'center' }]}>{glassesNote || (s.liveConversation && liveState === 'listening' && liveNote ? liveNote : listening ? `Microphone: ${mic}` : hint)}</Text>
+        <Text style={[S.dim, { textAlign: 'center' }]}>{glassesNote || (useLive && liveState === 'listening' && liveNote ? liveNote : listening ? `Microphone: ${mic}` : hint)}</Text>
       </View>
 
       <View style={S.row}>
@@ -232,7 +240,7 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
       {attached ? <Text style={[S.dim, { textAlign: 'center' }]} numberOfLines={1}>Ask anything about "{attached.name}". Tap Done to stop.</Text> : null}
 
       {look ? <LiveCamera hidden={s.cameraHidden} onClose={() => setLook(false)} /> : null}
-      {s.liveConversation ? (
+      {useLive ? (
         <View style={S.row}>
           <Btn style={{ flex: 1 }} kind={look ? 'primary' : 'ghost'} icon={look ? 'eye-off-outline' : 'eye-outline'} title={look ? 'Stop showing Alice' : 'Show Alice (live camera)'} onPress={() => setLook(!look)} />
           <Btn kind="ghost" icon={s.cameraHidden ? 'videocam-outline' : 'videocam-off-outline'} title={s.cameraHidden ? 'Show view' : 'Hide view'} onPress={() => updateSettings({ cameraHidden: !s.cameraHidden })} />
@@ -263,7 +271,7 @@ export default function Assist({ variant = 'full', onOpenApp, orbSize = 250 }: {
         </Card>
       ) : null}
 
-      {s.liveConversation ? lines.map((l) => (
+      {useLive ? lines.map((l) => (
         l.who === 'you'
           ? <Text key={l.t + l.who} style={{ fontFamily: F.light, fontSize: 20, lineHeight: 27, color: C.sub, letterSpacing: -0.2 }} selectable>{l.text}</Text>
           : l.who === 'done'

@@ -3,10 +3,23 @@
  * Deep night background lit by soft coloured light, frosted-glass panels floating
  * over it, and a living orb (src/Orb.tsx) as Alice's presence.
  * Type: Sora (display) + Inter (text). Approved by Robert 2026-11-25.
+ * Premium pass (2026-11-28): glass catches light along its top edge, buttons press in with a soft
+ * haptic tick, and the primary button is lit from above.
  */
+
+/** A light tap you can feel. Never throws (some devices have no haptics). */
+export const tick = (kind: 'light' | 'select' | 'success' = 'light') => {
+  try {
+    if (kind === 'select') Haptics.selectionAsync();
+    else if (kind === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  } catch {}
+};
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle, Switch, TextInput, TextStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 
 export const C = {
@@ -45,9 +58,11 @@ export const S = StyleSheet.create({
 /** Frosted glass panel: real iOS blur + a faint white film + hairline border. */
 export function Glass({ children, style, radius = 24, intensity = 30 }: { children?: React.ReactNode; style?: ViewStyle | ViewStyle[]; radius?: number; intensity?: number }) {
   return (
-    <View style={[{ borderRadius: radius, overflow: 'hidden', borderWidth: 1, borderColor: C.glassBorder }, style as any]}>
+    <View style={[{ borderRadius: radius, overflow: 'hidden', borderWidth: 1, borderColor: C.glassBorder, borderTopColor: 'rgba(255,255,255,0.24)' }, style as any]}>
       <BlurView intensity={intensity} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: C.glass }]} />
+      {/* light catching the top of the glass, fading down */}
+      <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0.10)', 'rgba(255,255,255,0.0)']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 0.55 }} style={StyleSheet.absoluteFill} />
       {children}
     </View>
   );
@@ -66,14 +81,17 @@ export function Btn({ title, onPress, kind = 'primary', disabled, style, icon }:
   const inner = (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, paddingHorizontal: 18, minHeight: 48 }}>
       {icon ? <Ionicons name={icon} size={18} color={kind === 'danger' ? C.red : C.ink} /> : null}
-      <Text style={{ color: kind === 'danger' ? C.red : C.ink, fontFamily: F.semibold, fontSize: 15 }}>{title}</Text>
+      <Text style={{ color: kind === 'danger' ? C.red : C.ink, fontFamily: F.semibold, fontSize: 15, letterSpacing: 0.1 }}>{title}</Text>
     </View>
   );
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={disabled} onPress={onPress}
-      style={({ pressed }) => [{ opacity: disabled ? 0.35 : pressed ? 0.7 : 1, borderRadius: 999 }, style]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={disabled} onPress={() => { tick(); onPress(); }}
+      style={({ pressed }) => [{ opacity: disabled ? 0.35 : 1, borderRadius: 999, transform: [{ scale: pressed ? 0.97 : 1 }] }, style]}>
       {kind === 'primary'
-        ? <View style={{ borderRadius: 999, backgroundColor: C.violet, shadowColor: C.violet, shadowOpacity: 0.8, shadowRadius: 16, shadowOffset: { width: 0, height: 0 } }}>{inner}</View>
+        ? <View style={{ borderRadius: 999, shadowColor: C.violet, shadowOpacity: 0.75, shadowRadius: 18, shadowOffset: { width: 0, height: 4 } }}>
+            <LinearGradient colors={['#A58BFF', '#7A55FF', '#5B36E8']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+              style={{ borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderTopColor: 'rgba(255,255,255,0.45)' }}>{inner}</LinearGradient>
+          </View>
         : <Glass radius={999} style={kind === 'danger' ? { borderColor: 'rgba(255,92,122,0.5)' } : undefined}>{inner}</Glass>}
     </Pressable>
   );

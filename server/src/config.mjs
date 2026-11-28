@@ -12,7 +12,7 @@ export const config = {
   transcribeProvider: env.TRANSCRIBE_PROVIDER ?? 'gemini',
   models: {
     gemini: { fast: env.GEMINI_FAST_MODEL ?? 'gemini-3.8-flash', research: env.GEMINI_RESEARCH_MODEL ?? 'gemini-4-argon', transcribe: env.GEMINI_TRANSCRIBE_MODEL ?? 'gemini-3.8-flash', tts: env.GEMINI_TTS_MODEL ?? 'gemini-3.8-flash-tts' },
-    openai: { fast: env.OPENAI_FAST_MODEL ?? 'gpt-6-luna', research: env.OPENAI_RESEARCH_MODEL ?? 'gpt-6-luna', transcribe: env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-transcribe' },
+    openai: { fast: env.OPENAI_FAST_MODEL ?? 'gpt-6-luna', research: env.OPENAI_RESEARCH_MODEL ?? 'gpt-6-luna', transcribe: env.OPENAI_TRANSCRIBE_MODEL ?? 'gpt-transcribe', tts: env.OPENAI_TTS_MODEL ?? 'gpt-4o-mini-tts' },
   },
   // Modes that may use web search (Google Search / OpenAI web_search)
   searchModes: json(env.SEARCH_MODES, ['general', 'research', 'navigator', 'pc']),
@@ -29,6 +29,7 @@ export const config = {
   // Natural voices for Alice (Gemini prebuilt voices). The app may pick any of these.
   voices: json(env.VOICES, ['Sulafat', 'Aoede', 'Laomedeia', 'Achernar', 'Vindemiatrix', 'Despina', 'Gacrux', 'Kore', 'Callirrhoe', 'Erinome', 'Leda', 'Zephyr', 'Autonoe', 'Pulcherrima']),
   defaultVoice: env.DEFAULT_VOICE ?? 'Sulafat',
+  openaiVoice: env.OPENAI_VOICE ?? 'marin', // used when Gemini's voice is unavailable
   limits: {
     speechPerInstallPerDay: Number(env.SPEECH_DAILY_LIMIT ?? 600),
     perInstallPerDay: Number(env.DAILY_LIMIT ?? 300),

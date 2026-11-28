@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Animated, Easing, Linking, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -45,7 +45,7 @@ import { healthUrl } from './src/ai';
 import { live, LiveState } from './src/live';
 import './src/glassesVoice'; // glasses microphone -> Alice, app-wide
 import { Backdrop, Orb } from './src/Orb';
-import { C, F, Glass, Ionicons } from './src/ui';
+import { C, F, Glass, Ionicons, tick } from './src/ui';
 import { useLayout, RAIL, knownFoldable } from './src/layout';
 
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -65,14 +65,22 @@ function TabBar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   useEffect(() => live.subscribe({ state: (st) => setLs(st) }), []);
   const talking = ls !== 'off' && ls !== 'error';
   const inset = useSafeAreaInsets();
+  // The highlight glides to the tab you pick.
+  const [w, setW] = useState(0);
+  const idx = Math.max(0, TABS.findIndex((t) => t.id === tab));
+  const slide = React.useRef(new Animated.Value(idx)).current;
+  useEffect(() => { Animated.spring(slide, { toValue: idx, useNativeDriver: true, speed: 18, bounciness: 6 }).start(); }, [idx]);
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 14, right: 14, bottom: Math.max(inset.bottom, 12) }}>
       <Glass radius={30} intensity={50} style={{ flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 6, backgroundColor: 'rgba(10,12,30,0.55)' }}>
+        <View onLayout={(e) => setW(e.nativeEvent.layout.width)} pointerEvents="none" style={{ position: 'absolute', left: 6, right: 6, top: 6, bottom: 6 }}>
+          {w ? <Animated.View style={{ position: 'absolute', top: 0, bottom: 0, width: w / TABS.length, borderRadius: 22, backgroundColor: 'rgba(140,107,255,0.22)', borderWidth: 1, borderColor: 'rgba(140,107,255,0.35)', transform: [{ translateX: slide.interpolate({ inputRange: [0, TABS.length - 1], outputRange: [0, (w / TABS.length) * (TABS.length - 1)] }) }] }} /> : null}
+        </View>
         {TABS.map((t) => {
           const on = tab === t.id;
           const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
           return (
-            <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => setTab(t.id)}
+            <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => { if (!on) tick('select'); setTab(t.id); }}
               style={{ flex: 1, alignItems: 'center', paddingVertical: 4, gap: 3 }}>
               <View style={on ? { shadowColor: C.violet, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : undefined}>
                 <Ionicons name={on ? t.iconOn : t.icon} size={23} color={on ? C.ink : C.sub} />
@@ -103,7 +111,7 @@ function Rail({ tab, setTab, showTalk }: { tab: Tab; setTab: (t: Tab) => void; s
           const on = tab === t.id;
           const badge = t.id === 'assist' && talking ? C.mint : t.id === 'home' ? (g.busy ? C.red : g.link === 'connected' ? C.mint : undefined) : t.id === 'media' && g.newMediaSinceImport ? C.pink : undefined;
           return (
-            <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => setTab(t.id)}
+            <Pressable key={t.id} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => { if (!on) tick('select'); setTab(t.id); }}
               style={{ width: 62, alignItems: 'center', paddingVertical: 9, gap: 4, borderRadius: 22, backgroundColor: on ? 'rgba(140,107,255,0.22)' : 'transparent' }}>
               <View style={on ? { shadowColor: C.violet, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } } : undefined}>
                 <Ionicons name={on ? t.iconOn : t.icon} size={23} color={on ? C.ink : C.sub} />
@@ -189,20 +197,31 @@ function Shell() {
             <View style={{ flex: 1, flexDirection: 'row', paddingLeft: lay.inset.left, paddingRight: lay.inset.right }}>
               <Rail tab={lay.split && tab === 'assist' ? 'home' : tab} setTab={setTab} showTalk={!lay.split} />
               {lay.split ? <>
-                <View style={{ width: lay.left }}>{screens[tab === 'assist' ? 'home' : tab]}</View>
+                <View style={{ width: lay.left }}><FadeIn k={tab}>{screens[tab === 'assist' ? 'home' : tab]}</FadeIn></View>
                 <View style={{ width: 1, marginVertical: 24, backgroundColor: 'rgba(255,255,255,0.08)' }} />
                 <View style={{ width: lay.right - 1 }}><Assist orbSize={200} /></View>
               </> : <View style={{ flex: 1 }}>{tab === 'assist' ? <Assist orbSize={230} /> : screens[tab]}</View>}
             </View>
           )
           : ready && fontsLoaded && lay.cover && !coverFull ? <Assist variant="cover" onOpenApp={() => { setCoverFull(true); setTab('home'); }} />
-          : ready && fontsLoaded ? screens[tab] : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
+          : ready && fontsLoaded ? <FadeIn k={tab}>{screens[tab]}</FadeIn> : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Orb size={140} /></View>}
       </View>
       {ready && fontsLoaded && !needsSetup && !tour ? <ActivityBanner /> : null}
       {ready && fontsLoaded && !needsSetup && !tour && !lay.wide && !(lay.cover && !coverFull)
         ? <TabBar tab={tab} setTab={(t) => { if (lay.cover && t === 'assist') setCoverFull(false); else setTab(t); }} /> : null}
     </View>
   );
+}
+
+/** Each screen eases in (a short fade and lift) when you switch to it. */
+function FadeIn({ k, children }: { k: string; children: React.ReactNode }) {
+  const a = React.useRef(new Animated.Value(1)).current;
+  const first = React.useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    a.setValue(0); Animated.timing(a, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [k]);
+  return <Animated.View style={{ flex: 1, opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }] }}>{children}</Animated.View>;
 }
 
 /** Setup and tour read best at phone width, so on an unfolded screen they sit in a centered column. */

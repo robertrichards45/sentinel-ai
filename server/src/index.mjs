@@ -22,6 +22,22 @@ const PROVIDERS = { gemini, openai };
 const providerFor = (name) => (config.mock ? mock : PROVIDERS[name]);
 const hasKey = (name) => config.mock || !!config.keys[name];
 
+/**
+ * An out-of-credit or over-quota provider shouldn't silence Alice: if the other provider has a key, the same
+ * request is retried there. Only account problems switch providers; a bad request still fails normally.
+ */
+export const isAccountProblem = (e) => [402, 429].includes(e?.status) || /credit|quota|billing|RESOURCE_EXHAUSTED|insufficient/i.test(String(e?.message ?? ''));
+const other = (name) => Object.keys(PROVIDERS).find((n) => n !== name && hasKey(n));
+async function withFailover(name, fn) {
+  try { return { r: await fn(providerFor(name), name), name }; }
+  catch (e) {
+    const alt = other(name);
+    if (!alt || !isAccountProblem(e)) throw e;
+    console.error(new Date().toISOString(), 'failover', name, '->', alt, String(e.message).slice(0, 120));
+    return { r: await fn(providerFor(alt), alt), name: alt };
+  }
+}
+
 export function route(mode, override) {
   let name = config.allowProviderOverride && override && PROVIDERS[override] ? override : (config.routes[mode] ?? config.routes.default ?? 'gemini');
   if (!hasKey(name)) name = Object.keys(PROVIDERS).find(hasKey) ?? name; // fall back to any provider with a key
@@ -121,7 +137,7 @@ export const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/v1/speak') {
-      if (!config.mock && !config.keys.gemini) return send(res, 503, { error: 'Natural voice needs a Gemini key on the server.' });
+      if (!config.mock && !config.keys.gemini && !config.keys.openai) return send(res, 503, { error: 'Natural voice needs a Gemini or OpenAI key on the server.' });
       if (!take('global-speech', config.limits.globalPerDay * 2)) return send(res, 429, { error: 'Alice\'s voice is at today\'s capacity.' });
       if (!take('s:' + installId, config.limits.speechPerInstallPerDay)) return send(res, 429, { error: 'Voice limit reached for today.' });
       const b = await body(req);
@@ -129,8 +145,8 @@ export const server = createServer(async (req, res) => {
       if (!text) return send(res, 400, { error: 'No text' });
       const voice = config.voices.includes(b.voice) ? b.voice : config.defaultVoice;
       const t0 = Date.now();
-      const r = await (config.mock ? mock : gemini).speak({ text, voice, style: clean(b.style, 200) || undefined });
-      return send(res, 200, { audioBase64: r.audioBase64, mime: r.mime, voice, model: r.model, ms: Date.now() - t0 });
+      const { r, name } = await withFailover(config.keys.gemini || config.mock ? 'gemini' : 'openai', (p) => p.speak({ text, voice, style: clean(b.style, 200) || undefined }));
+      return send(res, 200, { audioBase64: r.audioBase64, mime: r.mime, voice, model: r.model, provider: name, ms: Date.now() - t0 });
     }
 
     const isAI = req.method === 'POST' && (url.pathname === '/v1/respond' || url.pathname === '/v1/transcribe');
@@ -146,8 +162,8 @@ export const server = createServer(async (req, res) => {
       if (!b.audioBase64) return send(res, 400, { error: 'No audio' });
       let name = config.transcribeProvider;
       if (!hasKey(name)) name = Object.keys(PROVIDERS).find(hasKey) ?? name;
-      const r = await providerFor(name).transcribe({ audioBase64: b.audioBase64, mime, hint: clean(b.hint, 1500) || undefined });
-      return send(res, 200, { text: r.text, provider: name, model: r.model, ms: Date.now() - t0 });
+      const { r, name: used } = await withFailover(name, (p) => p.transcribe({ audioBase64: b.audioBase64, mime, hint: clean(b.hint, 1500) || undefined }));
+      return send(res, 200, { text: r.text, provider: used, model: r.model, ms: Date.now() - t0 });
     }
 
     const mode = clean(b.mode, 32) || 'general';
@@ -160,13 +176,21 @@ export const server = createServer(async (req, res) => {
       b.text = heard; audio = undefined;
     }
     const history = Array.isArray(b.history) ? b.history.slice(-24).map((h) => ({ role: h.role === 'assistant' ? 'assistant' : 'user', text: clean(h.text, 4000) })) : [];
-    const r = await providerFor(rt.name).respond({
-      model: rt.model, system: withToday(clean(b.system, 20000), rt.search, clean(b.tz, 60)), history, text: clean(b.text, 8000),
+    const args = {
+      system: withToday(clean(b.system, 20000), rt.search, clean(b.tz, 60)), history, text: clean(b.text, 8000),
       imageBase64: typeof b.imageBase64 === 'string' ? b.imageBase64 : undefined, search: rt.search,
       audio,
       file: b.file && typeof b.file.base64 === 'string' && FILE_TYPES.includes(b.file.mime) ? { mime: b.file.mime, base64: b.file.base64, name: clean(b.file.name, 120) || 'document' } : undefined,
+    };
+    const { r, name: used } = await withFailover(rt.name, async (p, n) => {
+      if (n !== rt.name && args.audio) { // the backup can't take audio directly: transcribe it first
+        heard = (await p.transcribe({ audioBase64: args.audio.base64, mime: args.audio.mime })).text;
+        return p.respond({ ...args, model: config.models[n][rt.tier], text: heard, audio: undefined });
+      }
+      return p.respond({ ...args, model: config.models[n][rt.tier] });
     });
-    return send(res, 200, { text: r.text, heard, provider: rt.name, model: rt.model, tier: rt.tier, ms: Date.now() - t0, usage: r.usage, costUsd: costUsd(rt.model, r.usage), sources: r.sources });
+    const model = config.models[used][rt.tier];
+    return send(res, 200, { text: r.text, heard, provider: used, model, tier: rt.tier, ms: Date.now() - t0, usage: r.usage, costUsd: costUsd(model, r.usage), sources: r.sources });
   } catch (e) {
     const status = e.status && e.status >= 400 && e.status < 600 ? (e.status === 401 || e.status === 403 ? 502 : e.status) : 500;
     console.error(new Date().toISOString(), req.method, url.pathname, status, String(e.message).slice(0, 200)); // never logs bodies or keys

@@ -167,3 +167,11 @@ test('place search drops roads and duplicates, nearest first', async () => {
   await findPlaces('Walmart', 39.93, -80.75, { fetchImpl: fake });
   assert.equal(r1.length, 2); assert.equal(calls, 1); // second is cached
 });
+
+test('failover only for account problems', async () => {
+  const { isAccountProblem } = await import('../src/index.mjs');
+  assert.equal(isAccountProblem({ status: 429, message: 'Gemini 429: Resource has been exhausted' }), true);
+  assert.equal(isAccountProblem({ status: 400, message: 'Your prepayment credits are depleted.' }), true);
+  assert.equal(isAccountProblem({ status: 400, message: 'Invalid image' }), false);
+  assert.equal(isAccountProblem({ status: 500, message: 'Internal error' }), false);
+});

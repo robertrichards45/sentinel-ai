@@ -44,3 +44,22 @@ export async function transcribe({ audioBase64, mime }) {
   const j = await call('/audio/transcriptions', { method: 'POST', body: form }, 45000);
   return { text: String(j.text ?? '').trim(), usage: null, model };
 }
+
+/** Spoken reply (used when Gemini's voice is unavailable). Returns WAV so the phone plays it like Gemini's. */
+export async function speak({ text, voice, style }) {
+  const model = config.models.openai.tts;
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 45000);
+  try {
+    const r = await fetch(BASE + '/audio/speech', {
+      method: 'POST', signal: ctl.signal,
+      headers: { Authorization: `Bearer ${config.keys.openai}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, input: text, voice: OPENAI_VOICE[voice] ?? config.openaiVoice, response_format: 'wav', ...(style ? { instructions: style } : {}) }),
+    });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw Object.assign(new Error(`OpenAI ${r.status}: ${j.error?.message ?? 'speech failed'}`), { status: r.status }); }
+    return { audioBase64: Buffer.from(await r.arrayBuffer()).toString('base64'), mime: 'audio/wav', model };
+  } finally { clearTimeout(t); }
+}
+
+// Closest OpenAI voice to each Gemini voice, so Alice sounds as alike as possible when she switches.
+const OPENAI_VOICE = { Sulafat: 'marin', Aoede: 'coral', Laomedeia: 'shimmer', Achernar: 'sage', Vindemiatrix: 'nova', Despina: 'coral', Gacrux: 'sage', Kore: 'marin', Callirrhoe: 'shimmer', Erinome: 'nova', Leda: 'coral', Zephyr: 'shimmer', Autonoe: 'sage', Pulcherrima: 'marin' };

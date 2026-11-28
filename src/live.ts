@@ -111,6 +111,12 @@ const TOOLS = [
 
 const BARGE_RMS = 0.045; // phone-mic loudness of a close voice; Alice's echo from the glasses is well below this
 
+/** Set when Google refuses live voice for an account reason (out of credit); cleared after 30 minutes. */
+let blockedUntil = 0;
+export const liveBlocked = () => Date.now() < blockedUntil;
+/** Whether Alice should use live (real-time) conversation right now. */
+export const liveWanted = () => getSettings().liveConversation && !liveBlocked();
+
 class LiveSession {
   /** 'speaker' = a voice-only session that reads text aloud word for word (no tools, no memory). */
   constructor(readonly role: 'chat' | 'speaker' = 'chat') {}
@@ -250,9 +256,17 @@ class LiveSession {
     ws.onopen = () => ws.send(JSON.stringify(this.setupMessage(url)));
     ws.onmessage = (e) => this.onMessage(frameText(e.data), () => { ready = true; clearTimeout(guard); });
     ws.onerror = () => {};
-    ws.onclose = () => {
+    ws.onclose = (ev: any) => {
       clearTimeout(guard);
       if (this.ws !== ws || this.stopping) return;
+      // Google refuses live voice when the AI account is out of credit. Don't retry: switch Alice to
+      // one-question-at-a-time for a while (the server answers that through the backup AI account).
+      if (!ready && /credit|quota|billing|exhausted/i.test(String(ev?.reason ?? ''))) {
+        blockedUntil = Date.now() + 30 * 60_000;
+        note('live-out-of-credit', { reason: String(ev.reason).slice(0, 120) });
+        this.set('error', "My live voice isn't available right now, so I'm answering one question at a time.");
+        this.teardown(); return;
+      }
       if (!ready) return this.connect(i + 1); // try the other API version
       // Google ends each connection after ~10 minutes. Resume the same conversation on a NEW connection —
       // the old access token is single-use, so get a fresh one first (the cause of "Couldn't reach live voice"

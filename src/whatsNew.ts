@@ -8,6 +8,10 @@ import { readJson, writeJson } from './storage';
 import { getSettings } from './settings';
 
 export const RELEASES: { version: string; date: string; items: string[] }[] = [
+  { version: '0.21.0', date: '2026-11-28', items: [
+    'A more polished look: glass that catches the light, a gliding tab highlight, smooth screen changes and a soft tap you can feel',
+    'If my live voice is ever unavailable, I keep going one question at a time instead of going quiet',
+  ] },
   { version: '0.20.1', date: '2026-11-28', items: [
     'On iPhone Duo I now fill the whole inner screen instead of sitting in a small window',
     'When your phone is folded I show a clean glance screen: the time, me, what I just said, and one big Talk button',

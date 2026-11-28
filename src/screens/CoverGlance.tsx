@@ -10,7 +10,8 @@ import { Orb, OrbState, VoiceBars } from '../Orb';
 import { LiveCamera } from '../LiveCamera';
 import { useGlasses } from '../hooks';
 import { activeGlasses } from '../glasses/connector';
-import { C, F, Glass, Ionicons } from '../ui';
+import { C, F, Glass, Ionicons, tick } from '../ui';
+import { LinearGradient } from 'expo-linear-gradient';
 
 function useClock() {
   const [now, setNow] = useState(new Date());
@@ -37,7 +38,8 @@ function DockButton({ icon, label, onPress, on }: { icon: keyof typeof Ionicons.
   );
 }
 
-export function CoverGlance(p: Props) {
+export function CoverGlance(props: Props) {
+  const p = { ...props, onTalk: () => { tick(); props.onTalk(); }, onLook: () => { tick('select'); props.onLook(); } };
   const { width, height } = useWindowDimensions();
   const inset = useSafeAreaInsets();
   const now = useClock();
@@ -95,14 +97,14 @@ export function CoverGlance(p: Props) {
         <DockButton icon={p.look ? 'eye-off-outline' : 'eye-outline'} label={p.look ? 'Stop showing Alice' : 'Show Alice what you see'} onPress={p.onLook} on={p.look} />
         <Pressable onPress={p.onTalk} accessibilityRole="button" accessibilityLabel={p.talking ? 'Stop' : 'Talk to Alice'}
           style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.95 : 1 }] })}>
-          <View style={{ width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: p.talking ? C.pink : C.violet,
-            shadowColor: p.talking ? C.pink : C.violet, shadowOpacity: 0.85, shadowRadius: 22, shadowOffset: { width: 0, height: 0 },
-            borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' }}>
-            <Ionicons name={p.talking ? 'stop' : 'mic'} size={32} color="#FFFFFF" />
+          <View style={{ width: 84, height: 84, borderRadius: 42, shadowColor: p.talking ? C.pink : C.violet, shadowOpacity: 0.85, shadowRadius: 22, shadowOffset: { width: 0, height: 4 } }}>
+            <LinearGradient colors={p.talking ? ['#FF9BE4', '#FF5CC8', '#D9339F'] : ['#A58BFF', '#7A55FF', '#5B36E8']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+              style={{ flex: 1, borderRadius: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', borderTopColor: 'rgba(255,255,255,0.5)' }}>
+              <Ionicons name={p.talking ? 'stop' : 'mic'} size={32} color="#FFFFFF" />
+            </LinearGradient>
           </View>
         </Pressable>
-        <DockButton icon="grid-outline" label="Open all of Alice" onPress={() => p.onOpenApp?.()} />
+        <DockButton icon="grid-outline" label="Open all of Alice" onPress={() => { tick('select'); p.onOpenApp?.(); }} />
       </View>
     </View>
   );
