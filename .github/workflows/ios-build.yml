@@ -102,7 +102,7 @@ jobs:
       - name: Build release APK (64-bit phones)
         working-directory: android
         run: |
-          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+          printf "\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g\n" >> gradle.properties
           if ! ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon > build.log 2>&1; then
             grep -n -B40 -A40 "What went wrong" build.log | head -n 200
             grep -n -i "error" build.log | grep -v "^.*warning" | head -n 60
